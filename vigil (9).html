@@ -1466,8 +1466,6 @@
       <button class="chip" onclick="pickScheduleChip(30*MIN)">30m</button>
       <button class="chip" onclick="pickScheduleChip(1*HOUR)">1h</button>
       <button class="chip" onclick="pickScheduleChip(3*HOUR)">3h</button>
-      <button class="chip" onclick="pickScheduleTomorrow(9,0)">Tmrw 9:00</button>
-      <button class="chip" onclick="pickScheduleTomorrow(16,0)">Tmrw 16:00</button>
     </div>
     <div class="field" style="margin-bottom:14px">
       <label>Or pick exact date &amp; time</label>
@@ -1722,8 +1720,6 @@
         <button class="chip" type="button" onclick="pickTaskScheduleChip(30*MIN)">30m</button>
         <button class="chip" type="button" onclick="pickTaskScheduleChip(1*HOUR)">1h</button>
         <button class="chip" type="button" onclick="pickTaskScheduleChip(3*HOUR)">3h</button>
-        <button class="chip" type="button" onclick="pickTaskScheduleTomorrow(9,0)">Tmrw 9:00</button>
-        <button class="chip" type="button" onclick="pickTaskScheduleTomorrow(16,0)">Tmrw 16:00</button>
       </div>
       <div style="display:flex;gap:7px;align-items:center">
         <input type="datetime-local" id="tScheduleAt" style="flex:1">
@@ -4919,10 +4915,6 @@ document.getElementById('scheduleOverlay').addEventListener('mousedown', e=>{
 });
 function pickScheduleChip(ms){
   document.getElementById('scheduleAtInput').value = toLocalInput(Date.now()+ms);
-}
-function pickScheduleTomorrow(h,m){
-  const d = new Date(); d.setDate(d.getDate()+1); d.setHours(h,m,0,0);
-  document.getElementById('scheduleAtInput').value = toLocalInput(d.getTime());
 }
 function applySchedule(){
   const t = taskById(pendingScheduleTaskId);
