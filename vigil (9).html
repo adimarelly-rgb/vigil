@@ -846,19 +846,10 @@
   .ticon.over{color:var(--red);}
   .ticon.follow{color:var(--indigo);}
   .ticon.popped{color:var(--teal);}
-  .tfollow-sep{
-    display:flex;align-items:center;gap:8px;padding:10px 14px 4px;
-    font-size:calc(11px * var(--fs-scale));font-weight:800;letter-spacing:1px;color:var(--dim2);
-  }
-  .tfollow-sep::after{content:"";flex:1;height:1px;background:var(--border);}
-  .tsched-head{
-    display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;
-    background:var(--bg);border-bottom:1px solid var(--border);color:var(--text);
-  }
-  .tsched-head:hover{background:#eef0f2;}
-  .tsched-head .chev{width:13px;height:13px;color:var(--dim);transition:transform .12s;flex-shrink:0;}
-  .tsched-head span:not(.tsched-hint){font-size:calc(13px * var(--fs-scale));font-weight:700;}
-  .tsched-hint{margin-left:auto;font-size:calc(11.5px * var(--fs-scale));color:var(--dim2);font-weight:500;}
+  .tsec-head{cursor:pointer;user-select:none;}
+  .tsec-head:hover{color:var(--dim);}
+  .tsec-head .chev{width:12px;height:12px;transition:transform .12s;flex-shrink:0;}
+  .tsec-count{font-weight:700;letter-spacing:0;}
   .tsched-list{background:var(--bg);}
   .tsched-row{
     display:flex;align-items:center;gap:10px;padding:8px 14px 8px 38px;
@@ -4804,10 +4795,20 @@ function insertTaskByPriority(t){
   und.forEach((x,i)=>{ x.ord = i; });
 }
 
-let tasksScheduledOpen = false;
-function toggleScheduledSection(){
-  tasksScheduledOpen = !tasksScheduledOpen;
+/* collapsible section headers on the Tasks page */
+const taskSectionsOpen = {followup:true, scheduled:false, periodic:false};
+function toggleTaskSection(key){
+  taskSectionsOpen[key] = !taskSectionsOpen[key];
   render();
+}
+function taskSectionHead(key, label, count, addTitle, addFn){
+  const open = taskSectionsOpen[key];
+  return `<div class="tperiodic-head tsec-head" onclick="toggleTaskSection('${key}')" title="${open?'Collapse':'Expand'}">
+      <svg class="chev" style="transform:rotate(${open?'90':'180'}deg)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+      <span>${label}</span>
+      ${count ? `<span class="tsec-count">(${count})</span>` : ''}
+      <button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${ICONS.plus}</button>
+    </div>`;
 }
 function tasksPageHTML(){
   ensureTaskOrd();
@@ -4846,36 +4847,29 @@ function tasksPageHTML(){
   };
   regularUndone.forEach(renderRow);
   done.forEach(renderRow);
-  if(followUpUndone.length){
-    html += `<div class="tfollow-sep"><span>Follow up</span></div>`;
-    followUpUndone.forEach(renderRow);
+  html += taskSectionHead('followup', 'Follow up', followUpUndone.length, 'Add follow-up task', 'openTaskModal([],{followUp:true})');
+  if(taskSectionsOpen.followup){
+    if(followUpUndone.length) followUpUndone.forEach(renderRow);
+    else html += `<div class="empty" style="padding:10px 14px">No follow-up tasks.</div>`;
   }
 
-  if(scheduledHidden.length){
-    html += `<div class="tsched-head" onclick="toggleScheduledSection()">
-      <svg class="chev" style="transform:rotate(${tasksScheduledOpen?'90':'0'}deg)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
-      <svg class="ticon follow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      <span>Scheduled (${scheduledHidden.length})</span>
-      <span class="tsched-hint">hidden until their time — click to ${tasksScheduledOpen?'hide':'show'}</span>
-    </div>`;
-    if(tasksScheduledOpen){
-      html += `<div class="tsched-list">` + scheduledHidden.map(t=>`
+  html += taskSectionHead('scheduled', 'Scheduled', scheduledHidden.length, 'Add scheduled task', 'openTaskModal([],{schedule:true})');
+  if(taskSectionsOpen.scheduled){
+    html += scheduledHidden.length
+      ? `<div class="tsched-list">` + scheduledHidden.map(t=>`
         <div class="tsched-row" data-task="${t.id}">
           <span class="ttxt">${t.text}</span>
           <span class="prio ${t.priority}" style="pointer-events:none">${t.priority}</span>
           <span class="tsched-time">${fmtDue(t.scheduledFor)}</span>
-        </div>`).join('') + `</div>`;
-    }
+        </div>`).join('') + `</div>`
+      : `<div class="empty" style="padding:10px 14px">No scheduled tasks.</div>`;
   }
 
   if(!taskOrder.length && !scheduledHidden.length && q) html += `<div class="empty">No tasks match "${q}".</div>`;
   if(!tasksData.length) html += `<div class="empty">No tasks yet — type above and press Enter.</div>`;
 
-  html += `
-    <div class="tperiodic-head">
-      <span>Periodic tasks</span>
-      <button class="mini-btn" title="Add periodic task" onclick="openPeriodicModal()">${ICONS.plus}</button>
-    </div>
+  html += taskSectionHead('periodic', 'Periodic tasks', periodicTasks.length, 'Add periodic task', 'openPeriodicModal()');
+  if(taskSectionsOpen.periodic) html += `
     <div class="tperiodic-list">` +
       (periodicTasks.length ? periodicTasks.map(p=>`
         <div class="tperiodic-row">
@@ -4885,8 +4879,8 @@ function tasksPageHTML(){
           <button class="mini-btn nav-del" title="Delete" onclick="deletePeriodicTask(${p.id})">${ICONS.trash}</button>
         </div>`).join('')
       : `<div class="empty" style="padding:10px 14px">No periodic tasks yet.</div>`) +
-    `</div>
-  </div>`;
+    `</div>`;
+  html += `</div>`;
   return html;
 }
 
@@ -5002,8 +4996,11 @@ function deleteTask(id){
 }
 
 /* ---- Create Task modal ---- */
-function openTaskModal(alertIds){
+let taskModalFollowUp = false;
+function openTaskModal(alertIds, opts){
+  opts = opts || {};
   taskTargetAlerts = alertIds || [];
+  taskModalFollowUp = !!opts.followUp;
   const targets = alerts.filter(a=>taskTargetAlerts.includes(a.id));
   document.getElementById('tTarget').innerHTML = targets.length
     ? (targets.length===1
@@ -5018,6 +5015,7 @@ function openTaskModal(alertIds){
   document.getElementById('tPeriodicCustomN').value = '1';
   document.getElementById('tPeriodicCustomUnit').value = 'days';
   document.getElementById('tPeriodicCustomRow').style.display = 'none';
+  if(opts.schedule) pickTaskScheduleTomorrow(9,0);
   document.getElementById('taskOverlay').classList.add('show');
   setTimeout(()=>document.getElementById('tName').focus(), 50);
 }
@@ -5035,6 +5033,7 @@ function pickTaskScheduleTomorrow(h,m){
 function closeTaskModal(){
   document.getElementById('taskOverlay').classList.remove('show');
   taskTargetAlerts = [];
+  taskModalFollowUp = false;
 }
 document.getElementById('taskOverlay').addEventListener('mousedown', e=>{
   if(e.target===e.currentTarget) closeTaskModal();
@@ -5100,7 +5099,7 @@ function saveTaskModal(){
     due,
     repeat: null,
     alertIds: taskTargetAlerts,
-    followUp: tagged.followUp,
+    followUp: tagged.followUp || taskModalFollowUp,
     scheduledFor: (scheduleAt && scheduleAt>Date.now()) ? scheduleAt : null,
   });
   closeTaskModal();
