@@ -4792,7 +4792,7 @@ function insertTaskByPriority(t){
 }
 
 /* collapsible section headers on the Tasks page */
-const taskSectionsOpen = {followup:true, scheduled:false, periodic:false};
+const taskSectionsOpen = {followup:true, scheduled:false, periodic:false, done:true};
 function toggleTaskSection(key){
   taskSectionsOpen[key] = !taskSectionsOpen[key];
   render();
@@ -4803,7 +4803,7 @@ function taskSectionHead(key, label, count, addTitle, addFn){
       <svg class="chev" style="transform:rotate(${open?'90':'180'}deg)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
       <span>${label}</span>
       ${count ? `<span class="tsec-count">(${count})</span>` : ''}
-      <button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${ICONS.plus}</button>
+      ${addFn ? `<button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${ICONS.plus}</button>` : ''}
     </div>`;
 }
 function tasksPageHTML(){
@@ -4842,7 +4842,6 @@ function tasksPageHTML(){
     </div>`;
   };
   regularUndone.forEach(renderRow);
-  done.forEach(renderRow);
   html += taskSectionHead('followup', 'Follow up', followUpUndone.length, 'Add follow-up task', 'openTaskModal([],{followUp:true})');
   if(taskSectionsOpen.followup){
     if(followUpUndone.length) followUpUndone.forEach(renderRow);
@@ -4876,6 +4875,11 @@ function tasksPageHTML(){
         </div>`).join('')
       : `<div class="empty" style="padding:10px 14px">No periodic tasks yet.</div>`) +
     `</div>`;
+
+  if(done.length){
+    html += taskSectionHead('done', 'Done', done.length);
+    if(taskSectionsOpen.done) done.forEach(renderRow);
+  }
   html += `</div>`;
   return html;
 }
