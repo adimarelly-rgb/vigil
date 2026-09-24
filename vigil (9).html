@@ -867,7 +867,7 @@
   }
   .tperiodic-row .ttxt{flex:1;}
   .tperiodic-meta{font-size:calc(11.5px * var(--fs-scale));color:var(--dim2);white-space:nowrap;}
-  .tmeta{display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap;}
+  .tmeta{position:relative;display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap;}
   .tchip{
     display:flex;gap:6px;align-items:center;font-size:calc(12px * var(--fs-scale));font-weight:700;color:var(--dim);
     background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:3px 11px;
@@ -5124,13 +5124,32 @@ function renderTaskDrawer(){
         <svg viewBox="0 0 24 24" fill="none" style="${t.done?'display:block':''}"><path d="M5 13l4 4 10-10"/></svg>
       </span>
       <span class="drawer-title" style="flex:1"><input id="taskTextIn" dir="auto" value="" style="width:100%;border:none;outline:none;font:inherit;font-size:calc(17px * var(--fs-scale));font-weight:800;background:transparent"></span>
-      <button class="drawer-close" title="Reminder &amp; repeat options" onclick="event.stopPropagation();toggleTMenu()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      <button class="drawer-close" data-act="taskdelete" title="Delete task">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
       </button>
       <button class="drawer-close" data-act="close" title="${drawerStack.length ? 'Back' : 'Close'}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${drawerStack.length ? 'M19 12H5M12 19l-7-7 7-7' : 'M18 6L6 18M6 6l12 12'}"/></svg>
       </button>
-      <div class="tmenu" id="tmenu" onclick="event.stopPropagation()">
+    </div>
+    <div class="tmeta">
+      <button class="prio ${t.priority}" data-act="cycleprio" title="Click to cycle A→B→C" style="cursor:pointer;border:none">${t.priority}</button>
+      <button class="tchip ${t.followUp?'follow-on':''}" data-act="togglefollow" title="Toggle follow-up (keyboard: F when this task is selected in the list)" style="cursor:pointer;border:${t.followUp?'1px solid var(--indigo)':'1px solid var(--border)'};background:${t.followUp?'#edf1ff':'var(--bg)'};color:${t.followUp?'var(--indigo)':'var(--dim)'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Follow up
+      </button>
+      <button class="tchip ${t.scheduledFor?'follow-on':''}" onclick="event.stopPropagation();openScheduleModal(${t.id})" title="Schedule for later — hide from TODO until then (keyboard: T when this task is selected in the list)" style="cursor:pointer;border:${t.scheduledFor?'1px solid var(--teal)':'1px solid var(--border)'};background:${t.scheduledFor?'var(--green-bg)':'var(--bg)'};color:${t.scheduledFor?'var(--teal)':'var(--dim)'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/></svg>
+        ${t.scheduledFor ? `Scheduled — ${fmtDue(t.scheduledFor)}` : 'Schedule'}
+      </button>
+      <button class="tchip" onclick="event.stopPropagation();toggleTMenu('tmenuRepeat',this)" title="Repeat" style="cursor:pointer;border:${t.repeat?'1px solid var(--blue)':'1px solid var(--border)'};background:${t.repeat?'var(--blue-bg)':'var(--bg)'};color:${t.repeat?'var(--blue)':'var(--dim)'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>
+        ${t.repeat ? t.repeat.charAt(0).toUpperCase()+t.repeat.slice(1) : 'Repeat'}
+      </button>
+      <button class="tchip ${t.due?dc:''}" onclick="event.stopPropagation();toggleTMenu('tmenuReminder',this)" title="Reminder" style="cursor:pointer;${t.due?(dc?'':'border:1px solid var(--orange);background:var(--orange-bg);color:var(--orange)'):'border:1px solid var(--border);background:var(--bg);color:var(--dim)'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
+        ${t.due ? fmtDue(t.due) : 'Reminder'}
+      </button>
+      <div class="tmenu" id="tmenuReminder" onclick="event.stopPropagation()" style="top:34px;left:0;right:auto">
         <h4>REMINDER</h4>
         <span class="chips" style="margin:0 0 8px">
           <button class="chip" data-act="taskduechip" data-ms="${10*MIN}">10m</button>
@@ -5144,13 +5163,8 @@ function renderTaskDrawer(){
             style="flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:calc(12.5px * var(--fs-scale));outline:none">
           ${t.due ? `<button class="btn" data-act="taskduechip" data-ms="clear" style="padding:6px 10px;font-size:calc(12px * var(--fs-scale))">Remove</button>` : ''}
         </div>
-        <div class="sep"></div>
-        <h4>SCHEDULE (hide until due)</h4>
-        <button class="btn" style="width:100%;justify-content:center" onclick="event.stopPropagation();toggleTMenu();openScheduleModal(${t.id})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-          ${t.scheduledFor ? `Scheduled — ${fmtDue(t.scheduledFor)}` : 'Set schedule… (t)'}
-        </button>
-        <div class="sep"></div>
+      </div>
+      <div class="tmenu" id="tmenuRepeat" onclick="event.stopPropagation()" style="top:34px;left:0;right:auto">
         <h4>REPEAT</h4>
         <select id="taskRepeatSel" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:calc(13px * var(--fs-scale));outline:none;background:var(--panel)">
           <option value="" ${!t.repeat?'selected':''}>None</option>
@@ -5158,31 +5172,7 @@ function renderTaskDrawer(){
           <option value="daily" ${t.repeat==='daily'?'selected':''}>Daily</option>
           <option value="weekly" ${t.repeat==='weekly'?'selected':''}>Weekly</option>
         </select>
-        <div class="sep"></div>
-        <button class="btn danger" data-act="taskdelete" style="width:100%;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
-          Delete task
-        </button>
       </div>
-    </div>
-    <div class="tmeta">
-      <button class="prio ${t.priority}" data-act="cycleprio" title="Click to cycle A→B→C" style="cursor:pointer;border:none">${t.priority}</button>
-      <button class="tchip ${t.followUp?'follow-on':''}" data-act="togglefollow" title="Toggle follow-up (keyboard: F when this task is selected in the list)" style="cursor:pointer;border:${t.followUp?'1px solid var(--indigo)':'1px solid var(--border)'};background:${t.followUp?'#edf1ff':'var(--bg)'};color:${t.followUp?'var(--indigo)':'var(--dim)'}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-        Follow up
-      </button>
-      <button class="tchip ${t.scheduledFor?'follow-on':''}" onclick="event.stopPropagation();openScheduleModal(${t.id})" title="Schedule for later — hide from TODO until then (keyboard: T when this task is selected in the list)" style="cursor:pointer;border:${t.scheduledFor?'1px solid var(--teal)':'1px solid var(--border)'};background:${t.scheduledFor?'var(--green-bg)':'var(--bg)'};color:${t.scheduledFor?'var(--teal)':'var(--dim)'}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/></svg>
-        ${t.scheduledFor ? `Scheduled — ${fmtDue(t.scheduledFor)}` : 'Schedule'}
-      </button>
-      ${t.repeat ? `<span class="tchip" title="Repeats ${t.repeat}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>
-        ${t.repeat.charAt(0).toUpperCase()+t.repeat.slice(1)}
-      </span>` : ''}
-      ${t.due ? `<span class="tchip ${dc}" title="Reminder">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
-        ${fmtDue(t.due)}
-      </span>` : ''}
     </div>`;
   document.getElementById('taskTextIn').value = t.text;
 
@@ -5234,8 +5224,18 @@ function renderTaskDrawer(){
       </div>
     </div>`;
 }
-function toggleTMenu(){ document.getElementById('tmenu')?.classList.toggle('show'); }
-function closeTMenu(){ document.getElementById('tmenu')?.classList.remove('show'); }
+function toggleTMenu(id, anchor){
+  document.querySelectorAll('.tmenu').forEach(m=>{ if(m.id!==id) m.classList.remove('show'); });
+  const m = document.getElementById(id);
+  if(!m) return;
+  m.classList.toggle('show');
+  if(anchor && m.classList.contains('show')){
+    const maxLeft = m.parentElement.clientWidth - m.offsetWidth;
+    m.style.left = Math.max(0, Math.min(anchor.offsetLeft, maxLeft)) + 'px';
+  }
+}
+function closeTMenu(){ document.querySelectorAll('.tmenu.show').forEach(m=>m.classList.remove('show')); }
+document.addEventListener('click', closeTMenu);
 
 function handleTaskDrawerAct(act, btn){
   const t = taskById(drawerId);
