@@ -2053,9 +2053,10 @@ function safeRegex(src){
   if(!src) return null;
   try{ return new RegExp(src, 'i'); }catch(e){ return null; }
 }
-function groupOf(a){
-  const grps = currentGroups();
-  const p = currentPageObj();
+function groupOf(a){ return groupOfIn(currentPageObj(), a); }
+/* p = custom page object, or null for the built-in All Alerts / Singing pages */
+function groupOfIn(p, a){
+  const grps = p ? p.groups : globalGroups;
   for(const g of grps){
     if(g.exceptions && g.exceptions.includes(a.id)) return g.name;
   }
@@ -2066,16 +2067,22 @@ function groupOf(a){
     if(reEx && reEx.test(a.title+' '+a.desc+' '+a.src)) continue;
     return g.name;
   }
-  if(p) return null;
+  /* pages copied from All Alerts / Singing keep the built-in fallback:
+     an alert lands in the group matching its own group label */
+  if(p) return (p.copyOf && grps.some(g=>g.name===a.group)) ? a.group : null;
   if(grps.some(g=>g.name===a.group)) return a.group;
   /* unmatched — keep the alert's own group label rather than silently dumping it
      into whichever group happens to be last (e.g. a newly created one) */
   if(a.group) return a.group;
   return grps.length ? grps[grps.length-1].name : null;
 }
-function pageScope(a){
-  const p = currentPageObj();
-  if(p) return groupOf(a)!==null;
+function pageScope(a){ return pageScopeIn(currentPageObj(), a); }
+function pageScopeIn(p, a){
+  if(p){
+    if(p.copyOf==='singing' && a.status!=='silenced') return false;
+    if(p.copyOf==='all' && a.status==='silenced') return false;
+    return groupOfIn(p, a)!==null;
+  }
   if(page==='singing') return a.status==='silenced';
   return a.status!=='silenced';
 }
@@ -2124,7 +2131,7 @@ function visibleAlerts(){
     if(statusFilter){
       /* Singing alerts are always 'silenced' — there Firing means "would be firing
          by severity" (critical/warning) rather than the literal status. */
-      if(page==='singing' && statusFilter==='firing'){
+      if(isSingingLike() && statusFilter==='firing'){
         if(a.sev!=='critical' && a.sev!=='warning') return false;
       }else if(statusFilter==='downtime'){
         if(a.status!=='downtime') return false;
@@ -2271,14 +2278,14 @@ function renderSidebar(){
 }
 
 function countForCustomPage(p){
-  return alerts.filter(a=>{
-    for(const g of p.groups){
-      const re = safeRegex(g.regex);
-      if(re && re.test(a.title+' '+a.desc+' '+a.src)) return true;
-    }
-    return false;
-  }).length;
+  /* copies of All Alerts / Singing count "firing" the same way their source does */
+  const firingOnly = p.copyOf==='all' ? (a=>a.status==='firing')
+    : p.copyOf==='singing' ? (a=>a.sev==='critical' || a.sev==='warning')
+    : (()=>true);
+  return alerts.filter(a=>pageScopeIn(p, a) && firingOnly(a)).length;
 }
+/* Singing Alerts for Night, or a page copied from it */
+function isSingingLike(){ return page==='singing' || currentPageObj()?.copyOf==='singing'; }
 
 function toggleSection(id){
   collapsedSections.has(id) ? collapsedSections.delete(id) : collapsedSections.add(id);
@@ -2422,7 +2429,7 @@ function render(){
   expireDowntimes();
 
   const scoped = alerts.filter(pageScope);
-  numFiring.textContent = page==='singing'
+  numFiring.textContent = isSingingLike()
     ? scoped.filter(a=>a.sev==='critical' || a.sev==='warning').length
     : scoped.filter(a=>a.status==='firing').length;
   numDowntime.textContent = scoped.filter(a=>a.status==='downtime').length;
@@ -2668,7 +2675,8 @@ applyAppMode();
 /* ================= ACTIONS ================= */
 function setPage(p){
   if(isMvp() && !mvpAllowsPage(p)) p = 'all';
-  page = p; selected.clear(); selectedInc.clear(); statusFilter = (p==='all' || p==='singing') ? 'firing' : null; sortBy = null;
+  page = p; selected.clear(); selectedInc.clear(); sortBy = null;
+  statusFilter = (p==='all' || p==='singing' || currentPageObj()?.copyOf) ? 'firing' : null;
   /* Night Watch defaults to dark mode; leaving it restores your chosen theme */
   document.documentElement.setAttribute('data-theme', p==='singing' ? 'dark' : userSettings.theme);
   render();
@@ -3258,6 +3266,7 @@ function confirmDuplicatePage(){
   }
   const newId = 'pg'+(pageSeq++);
   const copy = {id:newId, name, color:payload.color, section:payload.section, groups:payload.groups};
+  if(payload.copyOf) copy.copyOf = payload.copyOf;
   if(payload.tiles) copy.tiles = payload.tiles;
   customPages.push(copy);
   collapsedSections.delete(payload.section);
@@ -3277,7 +3286,7 @@ function duplicateBuiltinPage(sourceLabel){
   openDupPageModal(
     `Copy "${sourceLabel}"'s groups into a new page.`,
     defaultCopyName(sourceLabel, 'alerts'),
-    {section:'alerts', color:pickedColor, groups:newGroups}
+    {section:'alerts', color:pickedColor, groups:newGroups, copyOf: sourceLabel==='All Alerts' ? 'all' : 'singing'}
   );
 }
 function duplicatePage(id){
@@ -3288,7 +3297,7 @@ function duplicatePage(id){
     serviceGroup: g.serviceGroup, aquaType: g.aquaType, rank: g.rank, priority: g.priority, sortBy: g.sortBy,
     exceptions: g.exceptions ? [...g.exceptions] : []
   }));
-  const payload = {section:p.section, color:p.color, groups:newGroups};
+  const payload = {section:p.section, color:p.color, groups:newGroups, copyOf:p.copyOf};
   if(p.tiles) payload.tiles = p.tiles.map(t=>({...t}));
   openDupPageModal(
     `Duplicate "${p.name}" and all its groups.`,
