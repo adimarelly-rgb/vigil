@@ -115,6 +115,21 @@
   .brand-name{font-size:calc(20px * var(--fs-scale));font-weight:800;letter-spacing:-.3px;}
   .brand-sub{font-size:calc(10px * var(--fs-scale));font-weight:600;letter-spacing:2px;color:var(--dim);}
 
+  /* Full / MVP1 version tabs */
+  .mode-tabs{display:flex;gap:2px;margin:0 6px 10px;padding:3px;background:var(--bg);border:1px solid var(--border);border-radius:9px;}
+  .mode-tab{
+    flex:1;border:none;background:transparent;border-radius:7px;padding:6px 8px;cursor:pointer;
+    font:inherit;font-size:calc(12.5px * var(--fs-scale));font-weight:700;color:var(--dim);
+  }
+  .mode-tab:hover{color:var(--text);}
+  .mode-tab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  /* MVP1: alerts only — no tasks, incidents or shift board */
+  html[data-mvp="1"] #createTaskBtn, html[data-mvp="1"] #bulkTaskBtn, html[data-mvp="1"] #assocIncBtn,
+  html[data-mvp="1"] #menuIncBtn, html[data-mvp="1"] #menuGotoBtn, html[data-mvp="1"] #menuDetachBtn,
+  html[data-mvp="1"] #menuTaskBtn, html[data-mvp="1"] .nav-sub .nav-del, html[data-mvp="1"] .nav-item[title="Keyboard shortcuts"],
+  html[data-mvp="1"] .drawer-actions [data-act="mission"], html[data-mvp="1"] .drawer-actions [data-act="incident"],
+  html[data-mvp="1"] .drawer-actions [data-act="gotoinc"], html[data-mvp="1"] .drawer-actions [data-act="detachinc"]{display:none !important;}
+
   .search-box{
     display:flex;align-items:center;gap:8px;
     border:1px solid var(--border);border-radius:8px;background:var(--bg);
@@ -1114,6 +1129,11 @@
     </div>
   </div>
 
+  <div class="mode-tabs" id="modeTabs">
+    <button class="mode-tab" data-mode="full" onclick="setAppMode('full')">Full</button>
+    <button class="mode-tab" data-mode="mvp1" onclick="setAppMode('mvp1')">MVP1</button>
+  </div>
+
   <div class="search-box">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
     <input placeholder="Search menu..." id="navSearch">
@@ -1300,7 +1320,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/><path d="M2 2l20 20"/></svg>
     Detach from Incident
   </button>
-  <button onclick="menuAction('mission')">
+  <button id="menuTaskBtn" onclick="menuAction('mission')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V4"/><path d="M4 4c3-1.5 6 1.5 9 0s5-1 7 0v9c-2-1-4-1.5-7 0s-6-1.5-9 0"/></svg>
     Add Task
   </button>
@@ -2176,6 +2196,7 @@ function renderSidebar(){
   const root = document.getElementById('navRoot');
   let html = '';
   SECTIONS.forEach(sec=>{
+    if(isMvp() && sec.id!=='alerts') return;
     /* Tasks, Incidents & Dashboards are single pages themselves — header navigates, no sub-pages */
     if(sec.id==='mission' || sec.id==='incidents' || sec.id==='dashboards'){
       const target = sec.id==='mission' ? 'tasks' : sec.id==='incidents' ? 'incidents' : 'shift';
@@ -2191,7 +2212,7 @@ function renderSidebar(){
       return;
     }
     const isCol = collapsedSections.has(sec.id);
-    const kids = customPages.filter(p=>p.section===sec.id);
+    const kids = isMvp() ? [] : customPages.filter(p=>p.section===sec.id);
     const secCount = sec.id==='alerts'
       ? alerts.filter(a=>a.status!=='silenced').length
       : (sec.count ?? '');
@@ -2200,7 +2221,7 @@ function renderSidebar(){
       <span class="label">${sec.label}</span>
       <span class="sec-tools">
         ${secCount!=='' ? `<span class="count">${secCount}</span>` : ''}
-        <button class="mini-btn" title="Add page" onclick="event.stopPropagation();openPageModal('${sec.id}')">${ICONS.plus}</button>
+        ${isMvp() ? '' : `<button class="mini-btn" title="Add page" onclick="event.stopPropagation();openPageModal('${sec.id}')">${ICONS.plus}</button>`}
         <button class="mini-btn sec-chev" title="Collapse">${ICONS.chev}</button>
       </span>
     </div>`;
@@ -2302,6 +2323,8 @@ function rowActionsHTML(a){
     return `<button class="rowbtn-solo" data-rowaction="${a.id}">Remove downtime</button>`;
   }
   const label = a.dt ? 'Remove downtime' : 'Downtime';
+  /* MVP1: the ▾ menu only holds task / incident actions, so drop it */
+  if(isMvp()) return `<button class="rowbtn-solo" data-rowaction="${a.id}">${label}</button>`;
   return `<span class="rowbtn">
     <button class="rb-label" data-rowaction="${a.id}">${label}</button>
     <button class="rb-arrow" data-menu="${a.id}" title="More actions">
@@ -2620,8 +2643,29 @@ function bulkRemoveDowntime(){
   toast(`Downtime removed from ${targets.length} alert${targets.length===1?'':'s'}${backToFiring?` · ${backToFiring} back to firing`:''}`);
 }
 
+/* ================= APP MODE (Full / MVP1) ================= */
+/* MVP1 = alerts only: All Alerts, Singing Alerts for Night and External Systems. */
+let appMode = 'full';
+try{ if(localStorage.getItem('vigil-mode')==='mvp1') appMode = 'mvp1'; }catch(e){}
+function isMvp(){ return appMode==='mvp1'; }
+const MVP_PAGES = ['all','singing'];
+function applyAppMode(){
+  document.documentElement.setAttribute('data-mvp', isMvp() ? '1' : '');
+  document.querySelectorAll('#modeTabs .mode-tab').forEach(b=>b.classList.toggle('active', b.dataset.mode===appMode));
+}
+function setAppMode(m){
+  appMode = m;
+  try{ localStorage.setItem('vigil-mode', m); }catch(e){}
+  applyAppMode();
+  closeDrawer(); closeTaskModal(); closeIncModal(); hideMenu();
+  if(isMvp() && !MVP_PAGES.includes(page)) setPage('all');
+  else render();
+}
+applyAppMode();
+
 /* ================= ACTIONS ================= */
 function setPage(p){
+  if(isMvp() && !MVP_PAGES.includes(p)) p = 'all';
   page = p; selected.clear(); selectedInc.clear(); statusFilter = (p==='all' || p==='singing') ? 'firing' : null; sortBy = null;
   /* Night Watch defaults to dark mode; leaving it restores your chosen theme */
   document.documentElement.setAttribute('data-theme', p==='singing' ? 'dark' : userSettings.theme);
@@ -3704,7 +3748,7 @@ document.addEventListener('keydown', e=>{
   const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
 
   /* Ctrl+Shift+T / N / A — new task from anywhere */
-  if(e.ctrlKey && e.shiftKey && ['t','n','a'].includes(e.key.toLowerCase())){
+  if(e.ctrlKey && e.shiftKey && ['t','n','a'].includes(e.key.toLowerCase()) && !isMvp()){
     e.preventDefault();
     openTaskModal([]);
     return;
@@ -5376,6 +5420,7 @@ function doLogin(){
 /* due-time "pop": notify when a task hits its due time, and pop
    scheduled / periodic tasks into the TODO list once their time arrives */
 setInterval(()=>{
+  if(isMvp()) return;   /* no tasks in MVP1 */
   let changed = false;
   tasksData.forEach(t=>{
     if(!t.done && t.due && t.due <= Date.now() && !taskNotified.has(t.id)){
