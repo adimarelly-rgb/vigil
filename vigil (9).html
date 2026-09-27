@@ -126,7 +126,7 @@
   /* MVP1: alerts only — no tasks, incidents or shift board */
   html[data-mvp="1"] #createTaskBtn, html[data-mvp="1"] #bulkTaskBtn, html[data-mvp="1"] #assocIncBtn,
   html[data-mvp="1"] #menuIncBtn, html[data-mvp="1"] #menuGotoBtn, html[data-mvp="1"] #menuDetachBtn,
-  html[data-mvp="1"] #menuTaskBtn, html[data-mvp="1"] .nav-sub .nav-del, html[data-mvp="1"] .nav-item[title="Keyboard shortcuts"],
+  html[data-mvp="1"] #menuTaskBtn, html[data-mvp="1"] .nav-item[title="Keyboard shortcuts"],
   html[data-mvp="1"] .drawer-actions [data-act="mission"], html[data-mvp="1"] .drawer-actions [data-act="incident"],
   html[data-mvp="1"] .drawer-actions [data-act="gotoinc"], html[data-mvp="1"] .drawer-actions [data-act="detachinc"]{display:none !important;}
 
@@ -2212,7 +2212,7 @@ function renderSidebar(){
       return;
     }
     const isCol = collapsedSections.has(sec.id);
-    const kids = isMvp() ? [] : customPages.filter(p=>p.section===sec.id);
+    const kids = customPages.filter(p=>p.section===sec.id);
     const secCount = sec.id==='alerts'
       ? alerts.filter(a=>a.status!=='silenced').length
       : (sec.count ?? '');
@@ -2221,7 +2221,7 @@ function renderSidebar(){
       <span class="label">${sec.label}</span>
       <span class="sec-tools">
         ${secCount!=='' ? `<span class="count">${secCount}</span>` : ''}
-        ${isMvp() ? '' : `<button class="mini-btn" title="Add page" onclick="event.stopPropagation();openPageModal('${sec.id}')">${ICONS.plus}</button>`}
+        <button class="mini-btn" title="Add page" onclick="event.stopPropagation();openPageModal('${sec.id}')">${ICONS.plus}</button>
         <button class="mini-btn sec-chev" title="Collapse">${ICONS.chev}</button>
       </span>
     </div>`;
@@ -2644,11 +2644,13 @@ function bulkRemoveDowntime(){
 }
 
 /* ================= APP MODE (Full / MVP1) ================= */
-/* MVP1 = alerts only: All Alerts, Singing Alerts for Night and External Systems. */
+/* MVP1 = alerts only: All Alerts, Singing Alerts for Night, custom alert pages
+   (create / duplicate) and External Systems. */
 let appMode = 'full';
 try{ if(localStorage.getItem('vigil-mode')==='mvp1') appMode = 'mvp1'; }catch(e){}
 function isMvp(){ return appMode==='mvp1'; }
-const MVP_PAGES = ['all','singing'];
+/* All Alerts, Singing, and any custom page created under Alerts */
+const mvpAllowsPage = p => p==='all' || p==='singing' || customPages.some(x=>x.id===p && x.section==='alerts');
 function applyAppMode(){
   document.documentElement.setAttribute('data-mvp', isMvp() ? '1' : '');
   document.querySelectorAll('#modeTabs .mode-tab').forEach(b=>b.classList.toggle('active', b.dataset.mode===appMode));
@@ -2658,14 +2660,14 @@ function setAppMode(m){
   try{ localStorage.setItem('vigil-mode', m); }catch(e){}
   applyAppMode();
   closeDrawer(); closeTaskModal(); closeIncModal(); hideMenu();
-  if(isMvp() && !MVP_PAGES.includes(page)) setPage('all');
+  if(isMvp() && !mvpAllowsPage(page)) setPage('all');
   else render();
 }
 applyAppMode();
 
 /* ================= ACTIONS ================= */
 function setPage(p){
-  if(isMvp() && !MVP_PAGES.includes(p)) p = 'all';
+  if(isMvp() && !mvpAllowsPage(p)) p = 'all';
   page = p; selected.clear(); selectedInc.clear(); statusFilter = (p==='all' || p==='singing') ? 'firing' : null; sortBy = null;
   /* Night Watch defaults to dark mode; leaving it restores your chosen theme */
   document.documentElement.setAttribute('data-theme', p==='singing' ? 'dark' : userSettings.theme);
