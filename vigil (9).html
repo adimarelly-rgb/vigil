@@ -581,9 +581,10 @@
   .tt-add{padding:7px 16px;font-size:calc(12.5px * var(--fs-scale));}
 
   .tt-pop{
-    display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:90;
+    display:none;position:fixed;z-index:200;
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
-    box-shadow:0 10px 30px rgba(0,0,0,.2);padding:12px;width:250px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px;width:250px;
+    max-height:70vh;overflow-y:auto;
   }
   .tt-pop.show{display:block;}
   .tt-flagrow, .tt-tagrow{
@@ -1832,24 +1833,7 @@
                 <span class="tt-exchev">&rsaquo;</span>
               </div>
               <div class="tt-exbody" id="tTimeBody" style="display:none">
-                <input type="time" id="tTimeInput" onchange="onTaskTimeChange()">
-                <button type="button" class="btn" style="padding:5px 10px;font-size:calc(11.5px * var(--fs-scale))" onclick="clearTaskTime()">Clear</button>
-              </div>
-
-              <div class="tt-exrow" id="tReminderRow" onclick="toggleCalRow('reminder')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
-                <span class="tt-exlabel" id="tReminderSummary">Reminder</span>
-                <span class="tt-exchev">&rsaquo;</span>
-              </div>
-              <div class="tt-exbody" id="tReminderBody" style="display:none">
-                <select id="tReminderSelect" onchange="onReminderChange()">
-                  <option value="">None</option>
-                  <option value="0">At time of task</option>
-                  <option value="5">5 minutes before</option>
-                  <option value="30">30 minutes before</option>
-                  <option value="60">1 hour before</option>
-                  <option value="1440">1 day before</option>
-                </select>
+                <select id="tTimeSelect" onchange="onTaskTimeChange()"></select>
               </div>
 
               <div class="tt-exrow" id="tRepeatRow" onclick="toggleCalRow('repeat')">
@@ -1858,26 +1842,27 @@
                 <span class="tt-exchev">&rsaquo;</span>
               </div>
               <div class="tt-exbody" id="tRepeatBody" style="display:none">
-                <select id="tPeriodicPreset" onchange="onPeriodicPresetChange()">
+                <select id="tRepeatPreset" onchange="onRepeatPresetChange()">
                   <option value="" selected>Does not repeat</option>
-                  <option value="900000">Every 15 minutes</option>
-                  <option value="1800000">Every 30 minutes</option>
-                  <option value="3600000">Every hour</option>
-                  <option value="14400000">Every 4 hours</option>
-                  <option value="86400000">Every day</option>
-                  <option value="604800000">Every week</option>
-                  <option value="1209600000">Every 2 weeks</option>
-                  <option value="2592000000">Every month</option>
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
                   <option value="custom">Custom…</option>
                 </select>
-                <div id="tPeriodicCustomRow" style="display:none;align-items:center;gap:6px">
-                  <span style="font-size:calc(12px * var(--fs-scale));color:var(--dim)">Every</span>
-                  <input type="number" id="tPeriodicCustomN" min="1" value="1" style="width:55px" oninput="updateCalSummary()">
-                  <select id="tPeriodicCustomUnit" onchange="updateCalSummary()">
-                    <option value="minutes">minutes</option>
-                    <option value="hours">hours</option>
-                    <option value="days" selected>days</option>
-                  </select>
+                <div id="tRepeatCustomRow" style="display:none;flex-direction:column;gap:7px;width:100%">
+                  <div style="display:flex;align-items:center;gap:6px;width:100%">
+                    <span style="font-size:calc(12px * var(--fs-scale));color:var(--dim);white-space:nowrap">Starts</span>
+                    <input type="datetime-local" id="tRepeatCustomStart" style="flex:1" onchange="updateCalSummary()">
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:calc(12px * var(--fs-scale));color:var(--dim)">Every</span>
+                    <input type="number" id="tRepeatCustomN" min="1" value="1" style="width:55px" oninput="updateCalSummary()">
+                    <select id="tRepeatCustomUnit" onchange="updateCalSummary()">
+                      <option value="hours">hour(s)</option>
+                      <option value="days" selected>day(s)</option>
+                      <option value="weeks">week(s)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4865,11 +4850,6 @@ document.getElementById('drawer').addEventListener('change', e=>{
       const v = e.target.value.trim();
       if(v){ t.text = v; render(); }
       else e.target.value = t.text;
-    }else if(e.target.id==='taskDueIn'){
-      const v = e.target.value;
-      t.due = v ? new Date(v).getTime() : null;
-      taskNotified.delete(t.id);
-      render();
     }else if(e.target.id==='taskRepeatSel'){
       t.repeat = e.target.value || null;
       t.notes.push({text: t.repeat ? `Repeat set: ${t.repeat}` : 'Repeat removed', at:Date.now()});
@@ -5261,7 +5241,21 @@ function toggleTtPop(event, popId){
   const pop = document.getElementById(popId);
   const isOpen = pop.classList.contains('show');
   closeAllTtPopovers();
-  if(!isOpen) pop.classList.add('show');
+  if(isOpen) return;
+  const btn = event.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  pop.style.top = (rect.bottom + 6) + 'px';
+  pop.style.left = rect.left + 'px';
+  pop.classList.add('show');
+  requestAnimationFrame(()=>{
+    const pr = pop.getBoundingClientRect();
+    if(pr.right > window.innerWidth - 8){
+      pop.style.left = Math.max(8, window.innerWidth - pr.width - 8) + 'px';
+    }
+    if(pr.bottom > window.innerHeight - 8){
+      pop.style.top = Math.max(8, rect.top - pr.height - 6) + 'px';
+    }
+  });
 }
 function closeAllTtPopovers(){
   document.querySelectorAll('.tt-pop.show').forEach(p=>p.classList.remove('show'));
@@ -5319,16 +5313,25 @@ function pickTaskDatePreset(kind){
   renderTaskCalGrid();
   applyComposerDateTime();
 }
-function onTaskTimeChange(){ applyComposerDateTime(); }
-function clearTaskTime(){
-  document.getElementById('tTimeInput').value = '';
-  applyComposerDateTime();
+function populateTimeSelectOptions(){
+  const sel = document.getElementById('tTimeSelect');
+  if(!sel) return;
+  let html = `<option value="">No time</option>`;
+  for(let h=0; h<24; h++){
+    for(let m=0; m<60; m+=30){
+      const hh = String(h).padStart(2,'0'), mm = String(m).padStart(2,'0');
+      const label = new Date(2000,0,1,h,m).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      html += `<option value="${hh}:${mm}">${label}</option>`;
+    }
+  }
+  sel.innerHTML = html;
 }
+function onTaskTimeChange(){ applyComposerDateTime(); }
 function applyComposerDateTime(){
   if(!calSelectedDate){
     document.getElementById('tScheduleAt').value = '';
   }else{
-    const timeVal = document.getElementById('tTimeInput').value;
+    const timeVal = document.getElementById('tTimeSelect').value;
     const d = new Date(calSelectedDate);
     if(timeVal){
       const [h,mn] = timeVal.split(':');
@@ -5338,25 +5341,38 @@ function applyComposerDateTime(){
     }
     document.getElementById('tScheduleAt').value = toLocalInput(d.getTime());
   }
-  onReminderChange();
-}
-function onReminderChange(){
-  const schedVal = document.getElementById('tScheduleAt').value;
-  const offsetStr = document.getElementById('tReminderSelect').value;
-  if(!schedVal || offsetStr===''){
-    document.getElementById('tDue').value = '';
-    updateCalSummary();
-    return;
-  }
-  const base = new Date(schedVal).getTime();
-  const due = base - (+offsetStr)*MIN;
-  document.getElementById('tDue').value = toLocalInput(due);
   updateCalSummary();
 }
 function onDurationChange(){
   document.getElementById('tScheduleAt').value = document.getElementById('tDurationStart').value;
   document.getElementById('tDue').value = document.getElementById('tDurationEnd').value;
   updateCalSummary();
+}
+function onRepeatPresetChange(){
+  const isCustom = document.getElementById('tRepeatPreset').value === 'custom';
+  document.getElementById('tRepeatCustomRow').style.display = isCustom ? 'flex' : 'none';
+  updateCalSummary();
+}
+function computeRepeatMs(){
+  const preset = document.getElementById('tRepeatPreset').value;
+  if(!preset) return 0;
+  if(preset==='hourly') return HOUR;
+  if(preset==='daily') return DAY;
+  if(preset==='weekly') return 7*DAY;
+  if(preset==='custom'){
+    const n = Math.max(1, +document.getElementById('tRepeatCustomN').value || 1);
+    const unit = document.getElementById('tRepeatCustomUnit').value;
+    const mult = unit==='hours' ? HOUR : unit==='weeks' ? 7*DAY : DAY;
+    return n*mult;
+  }
+  return 0;
+}
+function repeatCustomStart(){
+  if(document.getElementById('tRepeatPreset').value !== 'custom') return null;
+  const v = document.getElementById('tRepeatCustomStart').value;
+  if(!v) return null;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? null : t;
 }
 function toggleCalRow(name){
   const cap = name.charAt(0).toUpperCase()+name.slice(1);
@@ -5367,10 +5383,10 @@ function toggleCalRow(name){
 }
 function clearCalPopover(){
   calSelectedDate = null;
-  document.getElementById('tTimeInput').value = '';
-  document.getElementById('tReminderSelect').value = '';
-  document.getElementById('tPeriodicPreset').value = '';
-  document.getElementById('tPeriodicCustomRow').style.display = 'none';
+  document.getElementById('tTimeSelect').value = '';
+  document.getElementById('tRepeatPreset').value = '';
+  document.getElementById('tRepeatCustomRow').style.display = 'none';
+  document.getElementById('tRepeatCustomStart').value = '';
   document.getElementById('tDurationStart').value = '';
   document.getElementById('tDurationEnd').value = '';
   document.getElementById('tScheduleAt').value = '';
@@ -5378,13 +5394,9 @@ function clearCalPopover(){
   renderTaskCalGrid();
   updateCalSummary();
 }
-function fmtPeriodicLabelFromPreset(){
-  const everyMs = readPeriodicPicker('tPeriodicPreset','tPeriodicCustomRow','tPeriodicCustomN','tPeriodicCustomUnit');
-  return everyMs ? fmtPeriodicLabel(everyMs) : '';
-}
 function updateCalSummary(){
   const schedVal = document.getElementById('tScheduleAt').value;
-  const periodVal = document.getElementById('tPeriodicPreset').value;
+  const periodVal = document.getElementById('tRepeatPreset').value;
   let label = '';
   if(schedVal){
     const ts = new Date(schedVal).getTime();
@@ -5394,16 +5406,15 @@ function updateCalSummary(){
   document.getElementById('tCalLabel').textContent = label;
   document.getElementById('tCalBtn').classList.toggle('active', !!label);
 
-  const remSel = document.getElementById('tReminderSelect');
-  const remOpt = remSel.options[remSel.selectedIndex];
-  document.getElementById('tReminderSummary').textContent = remSel.value==='' ? 'Reminder' : ('Reminder — '+remOpt.text);
-  document.getElementById('tReminderSummary').classList.toggle('set', remSel.value!=='');
-  const repeatLabel = fmtPeriodicLabelFromPreset();
+  const repeatMs = computeRepeatMs();
+  const repeatLabel = repeatMs ? fmtPeriodicLabel(repeatMs) : '';
   document.getElementById('tRepeatSummary').textContent = repeatLabel ? ('Repeat — '+repeatLabel) : 'Repeat';
   document.getElementById('tRepeatSummary').classList.toggle('set', !!repeatLabel);
-  const timeVal = document.getElementById('tTimeInput').value;
-  document.getElementById('tTimeSummary').textContent = timeVal ? ('Time — '+timeVal) : 'Time';
-  document.getElementById('tTimeSummary').classList.toggle('set', !!timeVal);
+  const timeVal = document.getElementById('tTimeSelect').value;
+  const timeSel = document.getElementById('tTimeSelect');
+  const timeLabel = timeVal ? timeSel.options[timeSel.selectedIndex].text : '';
+  document.getElementById('tTimeSummary').textContent = timeLabel ? ('Time — '+timeLabel) : 'Time';
+  document.getElementById('tTimeSummary').classList.toggle('set', !!timeLabel);
 }
 function setComposerPriority(p){
   document.getElementById('tPrio').value = p;
@@ -5431,12 +5442,12 @@ function resetTaskComposer(){
   calViewMonth = now.getMonth();
   composerFollowUp = false;
   document.getElementById('tPrio').value = 'C';
-  document.getElementById('tPeriodicCustomN').value = '1';
-  document.getElementById('tPeriodicCustomUnit').value = 'days';
+  populateTimeSelectOptions();
+  document.getElementById('tRepeatCustomN').value = '1';
+  document.getElementById('tRepeatCustomUnit').value = 'days';
   setCalTab('date');
-  ['tTimeRow','tReminderRow','tRepeatRow'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  ['tTimeRow','tRepeatRow'].forEach(id=>document.getElementById(id).classList.remove('open'));
   document.getElementById('tTimeBody').style.display = 'none';
-  document.getElementById('tReminderBody').style.display = 'none';
   document.getElementById('tRepeatBody').style.display = 'none';
   clearCalPopover();
   updateFlagUI();
@@ -5456,11 +5467,6 @@ function openTaskModal(alertIds){
   resetTaskComposer();
   document.getElementById('taskOverlay').classList.add('show');
   setTimeout(()=>document.getElementById('tName').focus(), 50);
-}
-function onPeriodicPresetChange(){
-  const isCustom = document.getElementById('tPeriodicPreset').value === 'custom';
-  document.getElementById('tPeriodicCustomRow').style.display = isCustom ? 'flex' : 'none';
-  updateCalSummary();
 }
 function closeTaskModal(){
   document.getElementById('taskOverlay').classList.remove('show');
@@ -5489,15 +5495,6 @@ function fmtPeriodicLabel(ms){
   const mins = Math.round(ms/MIN);
   return `Every ${mins} minute${mins===1?'':'s'}`;
 }
-function readPeriodicPicker(presetId, customRowId, customNId, customUnitId){
-  const preset = document.getElementById(presetId).value;
-  if(!preset) return 0;
-  if(preset!=='custom') return +preset;
-  const n = Math.max(1, +document.getElementById(customNId).value || 1);
-  const unit = document.getElementById(customUnitId).value;
-  const mult = unit==='minutes' ? MIN : unit==='hours' ? HOUR : DAY;
-  return n*mult;
-}
 function saveTaskModal(){
   const raw = document.getElementById('tName').value.trim();
   if(!raw){ toast('Task text is required'); return; }
@@ -5508,7 +5505,7 @@ function saveTaskModal(){
   if(dv){ due = new Date(dv).getTime(); if(isNaN(due)) due = null; }
 
   const priority = document.getElementById('tPrio').value;
-  const everyMs = readPeriodicPicker('tPeriodicPreset','tPeriodicCustomRow','tPeriodicCustomN','tPeriodicCustomUnit');
+  const everyMs = computeRepeatMs();
   const scheduleAtVal = document.getElementById('tScheduleAt').value;
   let scheduleAt = tagged.scheduledFor;
   if(scheduleAtVal){
@@ -5519,7 +5516,8 @@ function saveTaskModal(){
   if(everyMs){
     /* recurring — this becomes a periodic task definition, not a one-off task */
     const label = fmtPeriodicLabel(everyMs);
-    const nextFire = (scheduleAt && scheduleAt>Date.now()) ? scheduleAt : Date.now()+everyMs;
+    const customStart = repeatCustomStart();
+    const nextFire = customStart || ((scheduleAt && scheduleAt>Date.now()) ? scheduleAt : Date.now()+everyMs);
     periodicTasks.push({id:periodicSeq++, text:tagged.text, priority, everyMs, label, nextFire});
     closeTaskModal();
     selected.clear();
@@ -5559,27 +5557,13 @@ function renderTaskDrawer(){
         <svg viewBox="0 0 24 24" fill="none" style="${t.done?'display:block':''}"><path d="M5 13l4 4 10-10"/></svg>
       </span>
       <span class="drawer-title" style="flex:1"><input id="taskTextIn" dir="auto" value="" style="width:100%;border:none;outline:none;font:inherit;font-size:calc(17px * var(--fs-scale));font-weight:800;background:transparent"></span>
-      <button class="drawer-close" title="Reminder &amp; repeat options" onclick="event.stopPropagation();toggleTMenu()">
+      <button class="drawer-close" title="Schedule &amp; repeat options" onclick="event.stopPropagation();toggleTMenu()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
       </button>
       <button class="drawer-close" data-act="close" title="${drawerStack.length ? 'Back' : 'Close'}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${drawerStack.length ? 'M19 12H5M12 19l-7-7 7-7' : 'M18 6L6 18M6 6l12 12'}"/></svg>
       </button>
       <div class="tmenu" id="tmenu" onclick="event.stopPropagation()">
-        <h4>REMINDER</h4>
-        <span class="chips" style="margin:0 0 8px">
-          <button class="chip" data-act="taskduechip" data-ms="${10*MIN}">10m</button>
-          <button class="chip" data-act="taskduechip" data-ms="${30*MIN}">30m</button>
-          <button class="chip" data-act="taskduechip" data-ms="${1*HOUR}">1h</button>
-          <button class="chip" data-act="taskduechip" data-ms="${3*HOUR}">3h</button>
-          <button class="chip" data-act="taskduechip" data-ms="tmrw">Tmrw 9:00</button>
-        </span>
-        <div style="display:flex;gap:7px;align-items:center">
-          <input type="datetime-local" id="taskDueIn" value="${t.due ? toLocalInput(t.due) : ''}"
-            style="flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:calc(12.5px * var(--fs-scale));outline:none">
-          ${t.due ? `<button class="btn" data-act="taskduechip" data-ms="clear" style="padding:6px 10px;font-size:calc(12px * var(--fs-scale))">Remove</button>` : ''}
-        </div>
-        <div class="sep"></div>
         <h4>SCHEDULE (hide until due)</h4>
         <button class="btn" style="width:100%;justify-content:center" onclick="event.stopPropagation();toggleTMenu();openScheduleModal(${t.id})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
@@ -5693,20 +5677,6 @@ function handleTaskDrawerAct(act, btn){
     }
     case 'taskprio': setTaskPriority(t.id, btn.dataset.p); break;
     case 'togglefollow': toggleTaskFollowUp(t.id); break;
-    case 'taskduechip': {
-      const v = btn.dataset.ms;
-      if(v==='clear'){ t.due = null; }
-      else if(v==='tmrw'){
-        const d = new Date(); d.setDate(d.getDate()+1); d.setHours(9,0,0,0);
-        t.due = d.getTime();
-      }else{
-        t.due = Date.now() + (+v);
-      }
-      taskNotified.delete(t.id);
-      if(t.due) t.notes.push({text:`Reminder set: ${fmtClock(t.due)}`, at:Date.now()});
-      render();
-      break;
-    }
     case 'taskdelete': deleteTask(t.id); break;
     case 'opentaskalert': {
       const id = +btn.dataset.id;
