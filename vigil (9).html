@@ -2471,9 +2471,7 @@ function render(){
   }
   document.getElementById('mgBtn').style.display = (isInc||isTasks) ? 'none' : 'flex';
 
-  /* Tasks page: Create Task is hidden (there's already a quick-add bar for
-     creating tasks); search stays in its normal spot in the top row. */
-  document.getElementById('createTaskBtn').style.display = isTasks ? 'none' : '';
+  document.getElementById('createTaskBtn').style.display = '';
   document.getElementById('dashBtns').style.display = (isDash && page!=='shift') ? 'flex' : 'none';
   if(isDash){
     document.getElementById('resolvedBtns').style.display = 'none';
