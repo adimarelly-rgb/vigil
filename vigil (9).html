@@ -115,6 +115,21 @@
   .brand-name{font-size:calc(20px * var(--fs-scale));font-weight:800;letter-spacing:-.3px;}
   .brand-sub{font-size:calc(10px * var(--fs-scale));font-weight:600;letter-spacing:2px;color:var(--dim);}
 
+  /* Full / MVP1 version tabs */
+  .mode-tabs{display:flex;gap:2px;margin:0 6px 10px;padding:3px;background:var(--bg);border:1px solid var(--border);border-radius:9px;}
+  .mode-tab{
+    flex:1;border:none;background:transparent;border-radius:7px;padding:6px 8px;cursor:pointer;
+    font:inherit;font-size:calc(12.5px * var(--fs-scale));font-weight:700;color:var(--dim);
+  }
+  .mode-tab:hover{color:var(--text);}
+  .mode-tab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+  /* MVP1: alerts only — no tasks, incidents or shift board */
+  html[data-mvp="1"] #createTaskBtn, html[data-mvp="1"] #bulkTaskBtn, html[data-mvp="1"] #assocIncBtn,
+  html[data-mvp="1"] #menuIncBtn, html[data-mvp="1"] #menuGotoBtn, html[data-mvp="1"] #menuDetachBtn,
+  html[data-mvp="1"] #menuTaskBtn, html[data-mvp="1"] .nav-item[title="Keyboard shortcuts"],
+  html[data-mvp="1"] .drawer-actions [data-act="mission"], html[data-mvp="1"] .drawer-actions [data-act="incident"],
+  html[data-mvp="1"] .drawer-actions [data-act="gotoinc"], html[data-mvp="1"] .drawer-actions [data-act="detachinc"]{display:none !important;}
+
   .search-box{
     display:flex;align-items:center;gap:8px;
     border:1px solid var(--border);border-radius:8px;background:var(--bg);
@@ -387,11 +402,6 @@
   .goc.crit .n{font-size:calc(12px * var(--fs-scale));background:var(--panel);}
   .goc.crit .n svg{width:11px;height:11px;}
   .goc.crit .gname{font-weight:700;}
-  @keyframes gnameCritBlink{
-    0%, 100%{ color:inherit; }
-    50%{ color:var(--red); }
-  }
-  .goc .gname.critblink{ animation:gnameCritBlink 1.3s ease-in-out infinite; }
 
   .row{
     display:grid;grid-template-columns:44px 1fr 1.1fr 172px;
@@ -924,19 +934,10 @@
   .ticon.over{color:var(--red);}
   .ticon.follow{color:var(--indigo);}
   .ticon.popped{color:var(--teal);}
-  .tfollow-sep{
-    display:flex;align-items:center;gap:8px;padding:10px 14px 4px;
-    font-size:calc(11px * var(--fs-scale));font-weight:800;letter-spacing:1px;color:var(--dim2);
-  }
-  .tfollow-sep::after{content:"";flex:1;height:1px;background:var(--border);}
-  .tsched-head{
-    display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;
-    background:var(--bg);border-bottom:1px solid var(--border);color:var(--text);
-  }
-  .tsched-head:hover{background:#eef0f2;}
-  .tsched-head .chev{width:13px;height:13px;color:var(--dim);transition:transform .12s;flex-shrink:0;}
-  .tsched-head span:not(.tsched-hint){font-size:calc(13px * var(--fs-scale));font-weight:700;}
-  .tsched-hint{margin-left:auto;font-size:calc(11.5px * var(--fs-scale));color:var(--dim2);font-weight:500;}
+  .tsec-head{cursor:pointer;user-select:none;}
+  .tsec-head:hover{color:var(--dim);}
+  .tsec-head .chev{width:12px;height:12px;transition:transform .12s;flex-shrink:0;}
+  .tsec-count{font-weight:700;letter-spacing:0;}
   .tsched-list{background:var(--bg);}
   .tsched-row{
     display:flex;align-items:center;gap:10px;padding:8px 14px 8px 38px;
@@ -954,7 +955,7 @@
   }
   .tperiodic-row .ttxt{flex:1;}
   .tperiodic-meta{font-size:calc(11.5px * var(--fs-scale));color:var(--dim2);white-space:nowrap;}
-  .tmeta{display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap;}
+  .tmeta{position:relative;display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap;}
   .tchip{
     display:flex;gap:6px;align-items:center;font-size:calc(12px * var(--fs-scale));font-weight:700;color:var(--dim);
     background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:3px 11px;
@@ -1201,6 +1202,11 @@
     </div>
   </div>
 
+  <div class="mode-tabs" id="modeTabs">
+    <button class="mode-tab" data-mode="full" onclick="setAppMode('full')">Full</button>
+    <button class="mode-tab" data-mode="mvp1" onclick="setAppMode('mvp1')">MVP1</button>
+  </div>
+
   <div class="search-box">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
     <input placeholder="Search menu..." id="navSearch">
@@ -1387,7 +1393,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/><path d="M2 2l20 20"/></svg>
     Detach from Incident
   </button>
-  <button onclick="menuAction('mission')">
+  <button id="menuTaskBtn" onclick="menuAction('mission')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V4"/><path d="M4 4c3-1.5 6 1.5 9 0s5-1 7 0v9c-2-1-4-1.5-7 0s-6-1.5-9 0"/></svg>
     Add Task
   </button>
@@ -1553,8 +1559,6 @@
       <button class="chip" onclick="pickScheduleChip(30*MIN)">30m</button>
       <button class="chip" onclick="pickScheduleChip(1*HOUR)">1h</button>
       <button class="chip" onclick="pickScheduleChip(3*HOUR)">3h</button>
-      <button class="chip" onclick="pickScheduleTomorrow(9,0)">Tmrw 9:00</button>
-      <button class="chip" onclick="pickScheduleTomorrow(16,0)">Tmrw 16:00</button>
     </div>
     <div class="field" style="margin-bottom:14px">
       <label>Or pick exact date &amp; time</label>
@@ -2153,7 +2157,6 @@ const PAGE_COLORS = ['#e03131','#e8590c','#f59f00','#2b8a3e','#0ca678','#1971c2'
 /* ================= STATE ================= */
 let page = 'all';
 let statusFilter = null;          /* null | 'firing' | 'downtime' | 'resolved' */
-let ackedCritSignature = {};      /* group name -> signature of critical-alert firing ids acknowledged via click */
 let dtFilterMode = 'all';         /* Downtime page: 'all' | 'timed' | 'forever' */
 function setDtFilterMode(mode){
   dtFilterMode = mode;
@@ -2209,9 +2212,10 @@ function safeRegex(src){
   if(!src) return null;
   try{ return new RegExp(src, 'i'); }catch(e){ return null; }
 }
-function groupOf(a){
-  const grps = currentGroups();
-  const p = currentPageObj();
+function groupOf(a){ return groupOfIn(currentPageObj(), a); }
+/* p = custom page object, or null for the built-in All Alerts / Singing pages */
+function groupOfIn(p, a){
+  const grps = p ? p.groups : globalGroups;
   for(const g of grps){
     if(g.exceptions && g.exceptions.includes(a.id)) return g.name;
   }
@@ -2222,16 +2226,22 @@ function groupOf(a){
     if(reEx && reEx.test(a.title+' '+a.desc+' '+a.src)) continue;
     return g.name;
   }
-  if(p) return null;
+  /* pages copied from All Alerts / Singing keep the built-in fallback:
+     an alert lands in the group matching its own group label */
+  if(p) return (p.copyOf && grps.some(g=>g.name===a.group)) ? a.group : null;
   if(grps.some(g=>g.name===a.group)) return a.group;
   /* unmatched — keep the alert's own group label rather than silently dumping it
      into whichever group happens to be last (e.g. a newly created one) */
   if(a.group) return a.group;
   return grps.length ? grps[grps.length-1].name : null;
 }
-function pageScope(a){
-  const p = currentPageObj();
-  if(p) return groupOf(a)!==null;
+function pageScope(a){ return pageScopeIn(currentPageObj(), a); }
+function pageScopeIn(p, a){
+  if(p){
+    if(p.copyOf==='singing' && a.status!=='silenced') return false;
+    if(p.copyOf==='all' && a.status==='silenced') return false;
+    return groupOfIn(p, a)!==null;
+  }
   if(page==='singing') return a.status==='silenced';
   return a.status!=='silenced';
 }
@@ -2280,7 +2290,7 @@ function visibleAlerts(){
     if(statusFilter){
       /* Singing alerts are always 'silenced' — there Firing means "would be firing
          by severity" (critical/warning) rather than the literal status. */
-      if(page==='singing' && statusFilter==='firing'){
+      if(isSingingLike() && statusFilter==='firing'){
         if(a.sev!=='critical' && a.sev!=='warning') return false;
       }else if(statusFilter==='downtime'){
         if(a.status!=='downtime') return false;
@@ -2352,6 +2362,7 @@ function renderSidebar(){
   const root = document.getElementById('navRoot');
   let html = '';
   SECTIONS.forEach(sec=>{
+    if(isMvp() && sec.id!=='alerts') return;
     /* Tasks, Incidents & Dashboards are single pages themselves — header navigates, no sub-pages */
     if(sec.id==='mission' || sec.id==='incidents' || sec.id==='dashboards'){
       const target = sec.id==='mission' ? 'tasks' : sec.id==='incidents' ? 'incidents' : 'shift';
@@ -2426,14 +2437,14 @@ function renderSidebar(){
 }
 
 function countForCustomPage(p){
-  return alerts.filter(a=>{
-    for(const g of p.groups){
-      const re = safeRegex(g.regex);
-      if(re && re.test(a.title+' '+a.desc+' '+a.src)) return true;
-    }
-    return false;
-  }).length;
+  /* copies of All Alerts / Singing count "firing" the same way their source does */
+  const firingOnly = p.copyOf==='all' ? (a=>a.status==='firing')
+    : p.copyOf==='singing' ? (a=>a.sev==='critical' || a.sev==='warning')
+    : (()=>true);
+  return alerts.filter(a=>pageScopeIn(p, a) && firingOnly(a)).length;
 }
+/* Singing Alerts for Night, or a page copied from it */
+function isSingingLike(){ return page==='singing' || currentPageObj()?.copyOf==='singing'; }
 
 function toggleSection(id){
   collapsedSections.has(id) ? collapsedSections.delete(id) : collapsedSections.add(id);
@@ -2478,6 +2489,8 @@ function rowActionsHTML(a){
     return `<button class="rowbtn-solo" data-rowaction="${a.id}">Remove downtime</button>`;
   }
   const label = a.dt ? 'Remove downtime' : 'Downtime';
+  /* MVP1: the ▾ menu only holds task / incident actions, so drop it */
+  if(isMvp()) return `<button class="rowbtn-solo" data-rowaction="${a.id}">${label}</button>`;
   return `<span class="rowbtn">
     <button class="rb-label" data-rowaction="${a.id}">${label}</button>
     <button class="rb-arrow" data-menu="${a.id}" title="More actions">
@@ -2526,8 +2539,6 @@ function rowHTML(a, withGroupTag){
 function slugify(s){ return s.replace(/[^a-zA-Z0-9]+/g,'-'); }
 
 function jumpToGroup(name, exclusive){
-  const clickedGroup = currentGroups().find(g=>g.name===name);
-  if(clickedGroup) ackedCritSignature[name] = critFiringSignature(clickedGroup);
   if(page==='tasks' || page==='incidents' || isDashPage()){
     page = 'all';
     selected.clear(); selectedInc.clear(); sortBy = null;
@@ -2552,13 +2563,6 @@ function jumpToGroup(name, exclusive){
   });
 }
 
-function critFiringSignature(g){
-  return (g.criticalAlerts||[]).filter(id=>{
-    const a = alerts.find(x=>x.id===id);
-    return a && a.status==='firing';
-  }).sort((a,b)=>a-b).join(',');
-}
-
 function renderGroupOverview(){
   const row = document.getElementById('goviewRow');
   const el = document.getElementById('groupOverview');
@@ -2575,9 +2579,7 @@ function renderGroupOverview(){
   el.innerHTML = grps.map(g=>{
     const n = firingByGroup[g.name]||0;
     const thresh = g.crit || 1;
-    const sig = critFiringSignature(g);
-    const critBlink = sig !== '' && ackedCritSignature[g.name] !== sig;
-    return `<div class="goc ${n>=thresh?'crit':''}" onclick="jumpToGroup('${g.name.replace(/'/g,"\\'")}')" title="Firing count"><span class="gname${critBlink?' critblink':''}">${g.name}</span><span class="n"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L4 14h6l-1 8 10-13h-6l1-7z"/></svg>${n}</span></div>`;
+    return `<div class="goc ${n>=thresh?'crit':''}" onclick="jumpToGroup('${g.name.replace(/'/g,"\\'")}')" title="Firing count"><span class="gname">${g.name}</span><span class="n"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L4 14h6l-1 8 10-13h-6l1-7z"/></svg>${n}</span></div>`;
   }).join('');
 }
 
@@ -2586,7 +2588,7 @@ function render(){
   expireDowntimes();
 
   const scoped = alerts.filter(pageScope);
-  numFiring.textContent = page==='singing'
+  numFiring.textContent = isSingingLike()
     ? scoped.filter(a=>a.sev==='critical' || a.sev==='warning').length
     : scoped.filter(a=>a.status==='firing').length;
   numDowntime.textContent = scoped.filter(a=>a.status==='downtime').length;
@@ -2805,9 +2807,32 @@ function bulkRemoveDowntime(){
   toast(`Downtime removed from ${targets.length} alert${targets.length===1?'':'s'}${backToFiring?` · ${backToFiring} back to firing`:''}`);
 }
 
+/* ================= APP MODE (Full / MVP1) ================= */
+/* MVP1 = alerts only: All Alerts, Singing Alerts for Night, custom alert pages
+   (create / duplicate) and External Systems. */
+let appMode = 'mvp1';
+function isMvp(){ return appMode==='mvp1'; }
+/* All Alerts, Singing, and any custom page created under Alerts */
+const mvpAllowsPage = p => p==='all' || p==='singing' || customPages.some(x=>x.id===p && x.section==='alerts');
+function applyAppMode(){
+  document.documentElement.setAttribute('data-mvp', isMvp() ? '1' : '');
+  document.querySelectorAll('#modeTabs .mode-tab').forEach(b=>b.classList.toggle('active', b.dataset.mode===appMode));
+}
+function setAppMode(m){
+  appMode = m;
+  try{ localStorage.setItem('vigil-mode', m); }catch(e){}
+  applyAppMode();
+  closeDrawer(); closeTaskModal(); closeIncModal(); hideMenu();
+  if(isMvp() && !mvpAllowsPage(page)) setPage('all');
+  else render();
+}
+applyAppMode();
+
 /* ================= ACTIONS ================= */
 function setPage(p){
-  page = p; selected.clear(); selectedInc.clear(); statusFilter = (p==='all' || p==='singing') ? 'firing' : null; sortBy = null;
+  if(isMvp() && !mvpAllowsPage(p)) p = 'all';
+  page = p; selected.clear(); selectedInc.clear(); sortBy = null;
+  statusFilter = (p==='all' || p==='singing' || currentPageObj()?.copyOf) ? 'firing' : null;
   /* Night Watch defaults to dark mode; leaving it restores your chosen theme */
   document.documentElement.setAttribute('data-theme', p==='singing' ? 'dark' : userSettings.theme);
   render();
@@ -3085,18 +3110,6 @@ function renderGroupsModal(){
           <div class="hint">The group's count turns red in the overview bar once firing alerts reach this number.</div>
         </div>
         <div class="field" style="margin-bottom:14px">
-          <label>Critical alerts</label>
-          <div class="hint" style="margin:0 0 8px">Pick up to 5 alerts — while any of them is firing, the group's name blinks red in the overview bar.</div>
-          <div class="exc-chips" id="critChips"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <input type="text" id="critPicker" list="critOptions" placeholder="Search alerts…" autocomplete="off"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();addCriticalAlert();}"
-                   style="flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:calc(13px * var(--fs-scale));outline:none;background:var(--panel);color:var(--text)">
-            <datalist id="critOptions"></datalist>
-            <button class="btn" onclick="addCriticalAlert()">Add</button>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:14px">
           <label>Exceptions</label>
           <div class="hint" style="margin:0 0 8px">Force specific alerts into this group even if they don't match the regex.</div>
           <div class="exc-chips" id="excChips"></div>
@@ -3148,7 +3161,6 @@ function renderGroupsModal(){
   if(editingGroup){
     const g = grps.find(x=>x.name===editingGroup);
     if(g) renderExceptionsUI(g);
-    if(g) renderCriticalAlertsUI(g);
   }
 }
 
@@ -3190,53 +3202,6 @@ function removeGroupException(id){
   const g = currentGroups().find(x=>x.name===editingGroup);
   if(!g) return;
   g.exceptions = (g.exceptions||[]).filter(x=>x!==id);
-  renderGroupsModal();
-  render();
-}
-
-const CRIT_ALERTS_MAX = 5;
-function renderCriticalAlertsUI(g){
-  const chipsEl = document.getElementById('critChips');
-  const picker = document.getElementById('critPicker');
-  const options = document.getElementById('critOptions');
-  if(!chipsEl || !picker || !options) return;
-  const list = g.criticalAlerts || [];
-  chipsEl.innerHTML = list.length
-    ? list.map(id=>{
-        const a = alerts.find(x=>x.id===id);
-        const label = a ? a.title : `#${id} (deleted)`;
-        return `<span class="exc-chip">${label}<button onclick="removeCriticalAlert(${id})" title="Remove critical alert">&times;</button></span>`;
-      }).join('')
-    : `<div style="font-size:calc(12.5px * var(--fs-scale));color:var(--dim2)">No critical alerts picked yet.</div>`;
-
-  const already = new Set(list);
-  const eligible = alerts.filter(a=>!already.has(a.id));
-  options.innerHTML = eligible.map(a=>`<option value="${a.title.replace(/"/g,'&quot;')}"></option>`).join('');
-  picker.dataset.eligibleIds = JSON.stringify(eligible.map(a=>a.id));
-  const atLimit = list.length >= CRIT_ALERTS_MAX;
-  picker.disabled = atLimit;
-  picker.placeholder = atLimit ? `Limit reached (${CRIT_ALERTS_MAX})` : 'Search alerts…';
-}
-function addCriticalAlert(){
-  const picker = document.getElementById('critPicker');
-  const typed = picker.value.trim();
-  if(!typed) return;
-  const g = currentGroups().find(x=>x.name===editingGroup);
-  if(!g) return;
-  g.criticalAlerts = g.criticalAlerts || [];
-  if(g.criticalAlerts.length >= CRIT_ALERTS_MAX){ toast(`You can pick up to ${CRIT_ALERTS_MAX} critical alerts`); return; }
-  const eligibleIds = JSON.parse(picker.dataset.eligibleIds || '[]');
-  const match = alerts.find(a=>eligibleIds.includes(a.id) && a.title.toLowerCase()===typed.toLowerCase());
-  if(!match){ toast('Pick an alert from the list'); return; }
-  if(!g.criticalAlerts.includes(match.id)) g.criticalAlerts.push(match.id);
-  picker.value = '';
-  renderGroupsModal();
-  render();
-}
-function removeCriticalAlert(id){
-  const g = currentGroups().find(x=>x.name===editingGroup);
-  if(!g) return;
-  g.criticalAlerts = (g.criticalAlerts||[]).filter(x=>x!==id);
   renderGroupsModal();
   render();
 }
@@ -3457,6 +3422,7 @@ function confirmDuplicatePage(){
   }
   const newId = 'pg'+(pageSeq++);
   const copy = {id:newId, name, color:payload.color, section:payload.section, groups:payload.groups};
+  if(payload.copyOf) copy.copyOf = payload.copyOf;
   if(payload.tiles) copy.tiles = payload.tiles;
   customPages.push(copy);
   collapsedSections.delete(payload.section);
@@ -3471,13 +3437,12 @@ function duplicateBuiltinPage(sourceLabel){
   const newGroups = globalGroups.map(g=>({
     name: g.name, regex: g.regex, regexExclude: g.regexExclude || '', crit: g.crit || 1,
     serviceGroup: g.serviceGroup, aquaType: g.aquaType, rank: g.rank, priority: g.priority, sortBy: g.sortBy,
-    exceptions: g.exceptions ? [...g.exceptions] : [],
-    criticalAlerts: g.criticalAlerts ? [...g.criticalAlerts] : []
+    exceptions: g.exceptions ? [...g.exceptions] : []
   }));
   openDupPageModal(
     `Copy "${sourceLabel}"'s groups into a new page.`,
     defaultCopyName(sourceLabel, 'alerts'),
-    {section:'alerts', color:pickedColor, groups:newGroups}
+    {section:'alerts', color:pickedColor, groups:newGroups, copyOf: sourceLabel==='All Alerts' ? 'all' : 'singing'}
   );
 }
 function duplicatePage(id){
@@ -3486,10 +3451,9 @@ function duplicatePage(id){
   const newGroups = (p.groups||[]).map(g=>({
     name: g.name, regex: g.regex, regexExclude: g.regexExclude || '', crit: g.crit || 1,
     serviceGroup: g.serviceGroup, aquaType: g.aquaType, rank: g.rank, priority: g.priority, sortBy: g.sortBy,
-    exceptions: g.exceptions ? [...g.exceptions] : [],
-    criticalAlerts: g.criticalAlerts ? [...g.criticalAlerts] : []
+    exceptions: g.exceptions ? [...g.exceptions] : []
   }));
-  const payload = {section:p.section, color:p.color, groups:newGroups};
+  const payload = {section:p.section, color:p.color, groups:newGroups, copyOf:p.copyOf};
   if(p.tiles) payload.tiles = p.tiles.map(t=>({...t}));
   openDupPageModal(
     `Duplicate "${p.name}" and all its groups.`,
@@ -3528,8 +3492,7 @@ function confirmDuplicateGroup(){
   const dest = document.getElementById('dupGroupDest').value;
   const copy = {name:g.name, regex:g.regex, regexExclude:g.regexExclude||'', crit:g.crit||1,
     serviceGroup:g.serviceGroup, aquaType:g.aquaType, rank:g.rank, priority:g.priority, sortBy:g.sortBy,
-    exceptions: g.exceptions ? [...g.exceptions] : [],
-    criticalAlerts: g.criticalAlerts ? [...g.criticalAlerts] : []};
+    exceptions: g.exceptions ? [...g.exceptions] : []};
   let targetGroups, targetLabel;
   if(dest==='__global'){
     targetGroups = globalGroups; targetLabel = 'Global groups';
@@ -3952,7 +3915,7 @@ document.addEventListener('keydown', e=>{
   const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
 
   /* Ctrl+Shift+T / N / A — new task from anywhere */
-  if(e.ctrlKey && e.shiftKey && ['t','n','a'].includes(e.key.toLowerCase())){
+  if(e.ctrlKey && e.shiftKey && ['t','n','a'].includes(e.key.toLowerCase()) && !isMvp()){
     e.preventDefault();
     openTaskModal([]);
     return;
@@ -4850,6 +4813,11 @@ document.getElementById('drawer').addEventListener('change', e=>{
       const v = e.target.value.trim();
       if(v){ t.text = v; render(); }
       else e.target.value = t.text;
+    }else if(e.target.id==='taskDueIn'){
+      const v = e.target.value;
+      t.due = v ? new Date(v).getTime() : null;
+      taskNotified.delete(t.id);
+      render();
     }else if(e.target.id==='taskRepeatSel'){
       t.repeat = e.target.value || null;
       t.notes.push({text: t.repeat ? `Repeat set: ${t.repeat}` : 'Repeat removed', at:Date.now()});
@@ -5034,10 +5002,20 @@ function insertTaskByPriority(t){
   und.forEach((x,i)=>{ x.ord = i; });
 }
 
-let tasksScheduledOpen = false;
-function toggleScheduledSection(){
-  tasksScheduledOpen = !tasksScheduledOpen;
+/* collapsible section headers on the Tasks page */
+const taskSectionsOpen = {followup:true, scheduled:false, periodic:false, done:true};
+function toggleTaskSection(key){
+  taskSectionsOpen[key] = !taskSectionsOpen[key];
   render();
+}
+function taskSectionHead(key, label, count, addTitle, addFn){
+  const open = taskSectionsOpen[key];
+  return `<div class="tperiodic-head tsec-head" onclick="toggleTaskSection('${key}')" title="${open?'Collapse':'Expand'}">
+      <svg class="chev" style="transform:rotate(${open?'90':'180'}deg)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+      <span>${label}</span>
+      ${count ? `<span class="tsec-count">(${count})</span>` : ''}
+      ${addFn ? `<button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${ICONS.plus}</button>` : ''}
+    </div>`;
 }
 function tasksPageHTML(){
   ensureTaskOrd();
@@ -5075,37 +5053,29 @@ function tasksPageHTML(){
     </div>`;
   };
   regularUndone.forEach(renderRow);
-  done.forEach(renderRow);
-  if(followUpUndone.length){
-    html += `<div class="tfollow-sep"><span>Follow up</span></div>`;
-    followUpUndone.forEach(renderRow);
+  html += taskSectionHead('followup', 'Follow up', followUpUndone.length, 'Add follow-up task', 'openTaskModal([],{followUp:true})');
+  if(taskSectionsOpen.followup){
+    if(followUpUndone.length) followUpUndone.forEach(renderRow);
+    else html += `<div class="empty" style="padding:10px 14px">No follow-up tasks.</div>`;
   }
 
-  if(scheduledHidden.length){
-    html += `<div class="tsched-head" onclick="toggleScheduledSection()">
-      <svg class="chev" style="transform:rotate(${tasksScheduledOpen?'90':'0'}deg)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
-      <svg class="ticon follow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      <span>Scheduled (${scheduledHidden.length})</span>
-      <span class="tsched-hint">hidden until their time — click to ${tasksScheduledOpen?'hide':'show'}</span>
-    </div>`;
-    if(tasksScheduledOpen){
-      html += `<div class="tsched-list">` + scheduledHidden.map(t=>`
+  html += taskSectionHead('scheduled', 'Scheduled', scheduledHidden.length, 'Add scheduled task', 'openTaskModal([],{schedule:true})');
+  if(taskSectionsOpen.scheduled){
+    html += scheduledHidden.length
+      ? `<div class="tsched-list">` + scheduledHidden.map(t=>`
         <div class="tsched-row" data-task="${t.id}">
           <span class="ttxt">${t.text}</span>
           <span class="prio ${t.priority}" style="pointer-events:none">${t.priority}</span>
           <span class="tsched-time">${fmtDue(t.scheduledFor)}</span>
-        </div>`).join('') + `</div>`;
-    }
+        </div>`).join('') + `</div>`
+      : `<div class="empty" style="padding:10px 14px">No scheduled tasks.</div>`;
   }
 
   if(!taskOrder.length && !scheduledHidden.length && q) html += `<div class="empty">No tasks match "${q}".</div>`;
   if(!tasksData.length) html += `<div class="empty">No tasks yet — type above and press Enter.</div>`;
 
-  html += `
-    <div class="tperiodic-head">
-      <span>Periodic tasks</span>
-      <button class="mini-btn" title="Add periodic task" onclick="openPeriodicModal()">${ICONS.plus}</button>
-    </div>
+  html += taskSectionHead('periodic', 'Periodic tasks', periodicTasks.length, 'Add periodic task', 'openPeriodicModal()');
+  if(taskSectionsOpen.periodic) html += `
     <div class="tperiodic-list">` +
       (periodicTasks.length ? periodicTasks.map(p=>`
         <div class="tperiodic-row">
@@ -5115,8 +5085,13 @@ function tasksPageHTML(){
           <button class="mini-btn nav-del" title="Delete" onclick="deletePeriodicTask(${p.id})">${ICONS.trash}</button>
         </div>`).join('')
       : `<div class="empty" style="padding:10px 14px">No periodic tasks yet.</div>`) +
-    `</div>
-  </div>`;
+    `</div>`;
+
+  if(done.length){
+    html += taskSectionHead('done', 'Done', done.length);
+    if(taskSectionsOpen.done) done.forEach(renderRow);
+  }
+  html += `</div>`;
   return html;
 }
 
@@ -5155,10 +5130,6 @@ document.getElementById('scheduleOverlay').addEventListener('mousedown', e=>{
 });
 function pickScheduleChip(ms){
   document.getElementById('scheduleAtInput').value = toLocalInput(Date.now()+ms);
-}
-function pickScheduleTomorrow(h,m){
-  const d = new Date(); d.setDate(d.getDate()+1); d.setHours(h,m,0,0);
-  document.getElementById('scheduleAtInput').value = toLocalInput(d.getTime());
 }
 function applySchedule(){
   const t = taskById(pendingScheduleTaskId);
@@ -5231,9 +5202,8 @@ function deleteTask(id){
   toast(`Task deleted: "${t.text}"`);
 }
 
-/* ---- Create Task modal ---- */
-/* ---- TickTick-style composer: calendar/flag/tag popovers ---- */
-let composerFollowUp = false;
+/* ---- Create Task modal: TickTick-style composer ---- */
+let taskModalFollowUp = false;
 let calViewYear, calViewMonth, calSelectedDate;
 
 function toggleTtPop(event, popId){
@@ -5429,18 +5399,17 @@ function updateFlagUI(){
   });
 }
 function toggleComposerFollowUp(){
-  composerFollowUp = !composerFollowUp;
+  taskModalFollowUp = !taskModalFollowUp;
   updateTagUI();
 }
 function updateTagUI(){
-  document.getElementById('tTagBtn').classList.toggle('active', composerFollowUp);
-  document.getElementById('tFollowUpRow').classList.toggle('selected', composerFollowUp);
+  document.getElementById('tTagBtn').classList.toggle('active', taskModalFollowUp);
+  document.getElementById('tFollowUpRow').classList.toggle('selected', taskModalFollowUp);
 }
 function resetTaskComposer(){
   const now = new Date();
   calViewYear = now.getFullYear();
   calViewMonth = now.getMonth();
-  composerFollowUp = false;
   document.getElementById('tPrio').value = 'A';
   populateTimeSelectOptions();
   document.getElementById('tRepeatCustomN').value = '1';
@@ -5455,8 +5424,10 @@ function resetTaskComposer(){
   closeAllTtPopovers();
 }
 
-function openTaskModal(alertIds){
+function openTaskModal(alertIds, opts){
+  opts = opts || {};
   taskTargetAlerts = alertIds || [];
+  taskModalFollowUp = !!opts.followUp;
   const targets = alerts.filter(a=>taskTargetAlerts.includes(a.id));
   document.getElementById('tTarget').innerHTML = targets.length
     ? (targets.length===1
@@ -5465,6 +5436,7 @@ function openTaskModal(alertIds){
     : `<b>No linked alerts</b>`;
   document.getElementById('tName').value = '';
   resetTaskComposer();
+  if(opts.schedule) pickTaskDatePreset('tomorrow');
   document.getElementById('taskOverlay').classList.add('show');
   setTimeout(()=>document.getElementById('tName').focus(), 50);
 }
@@ -5472,6 +5444,7 @@ function closeTaskModal(){
   document.getElementById('taskOverlay').classList.remove('show');
   closeAllTtPopovers();
   taskTargetAlerts = [];
+  taskModalFollowUp = false;
 }
 document.getElementById('taskOverlay').addEventListener('mousedown', e=>{
   if(e.target===e.currentTarget) closeTaskModal();
@@ -5532,7 +5505,7 @@ function saveTaskModal(){
     due,
     repeat: null,
     alertIds: taskTargetAlerts,
-    followUp: tagged.followUp || composerFollowUp,
+    followUp: tagged.followUp || taskModalFollowUp,
     scheduledFor: (scheduleAt && scheduleAt>Date.now()) ? scheduleAt : null,
   });
   closeTaskModal();
@@ -5557,32 +5530,12 @@ function renderTaskDrawer(){
         <svg viewBox="0 0 24 24" fill="none" style="${t.done?'display:block':''}"><path d="M5 13l4 4 10-10"/></svg>
       </span>
       <span class="drawer-title" style="flex:1"><input id="taskTextIn" dir="auto" value="" style="width:100%;border:none;outline:none;font:inherit;font-size:calc(17px * var(--fs-scale));font-weight:800;background:transparent"></span>
-      <button class="drawer-close" title="Schedule &amp; repeat options" onclick="event.stopPropagation();toggleTMenu()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+      <button class="drawer-close" data-act="taskdelete" title="Delete task">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
       </button>
       <button class="drawer-close" data-act="close" title="${drawerStack.length ? 'Back' : 'Close'}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${drawerStack.length ? 'M19 12H5M12 19l-7-7 7-7' : 'M18 6L6 18M6 6l12 12'}"/></svg>
       </button>
-      <div class="tmenu" id="tmenu" onclick="event.stopPropagation()">
-        <h4>SCHEDULE (hide until due)</h4>
-        <button class="btn" style="width:100%;justify-content:center" onclick="event.stopPropagation();toggleTMenu();openScheduleModal(${t.id})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-          ${t.scheduledFor ? `Scheduled — ${fmtDue(t.scheduledFor)}` : 'Set schedule… (t)'}
-        </button>
-        <div class="sep"></div>
-        <h4>REPEAT</h4>
-        <select id="taskRepeatSel" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:calc(13px * var(--fs-scale));outline:none;background:var(--panel)">
-          <option value="" ${!t.repeat?'selected':''}>None</option>
-          <option value="hourly" ${t.repeat==='hourly'?'selected':''}>Hourly</option>
-          <option value="daily" ${t.repeat==='daily'?'selected':''}>Daily</option>
-          <option value="weekly" ${t.repeat==='weekly'?'selected':''}>Weekly</option>
-        </select>
-        <div class="sep"></div>
-        <button class="btn danger" data-act="taskdelete" style="width:100%;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
-          Delete task
-        </button>
-      </div>
     </div>
     <div class="tmeta">
       <button class="prio ${t.priority}" data-act="cycleprio" title="Click to cycle A→B→C" style="cursor:pointer;border:none">${t.priority}</button>
@@ -5594,14 +5547,38 @@ function renderTaskDrawer(){
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/></svg>
         ${t.scheduledFor ? `Scheduled — ${fmtDue(t.scheduledFor)}` : 'Schedule'}
       </button>
-      ${t.repeat ? `<span class="tchip" title="Repeats ${t.repeat}">
+      <button class="tchip" onclick="event.stopPropagation();toggleTMenu('tmenuRepeat',this)" title="Repeat" style="cursor:pointer;border:${t.repeat?'1px solid var(--blue)':'1px solid var(--border)'};background:${t.repeat?'var(--blue-bg)':'var(--bg)'};color:${t.repeat?'var(--blue)':'var(--dim)'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>
-        ${t.repeat.charAt(0).toUpperCase()+t.repeat.slice(1)}
-      </span>` : ''}
-      ${t.due ? `<span class="tchip ${dc}" title="Reminder">
+        ${t.repeat ? t.repeat.charAt(0).toUpperCase()+t.repeat.slice(1) : 'Repeat'}
+      </button>
+      <button class="tchip ${t.due?dc:''}" onclick="event.stopPropagation();toggleTMenu('tmenuReminder',this)" title="Reminder" style="cursor:pointer;${t.due?(dc?'':'border:1px solid var(--orange);background:var(--orange-bg);color:var(--orange)'):'border:1px solid var(--border);background:var(--bg);color:var(--dim)'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
-        ${fmtDue(t.due)}
-      </span>` : ''}
+        ${t.due ? fmtDue(t.due) : 'Reminder'}
+      </button>
+      <div class="tmenu" id="tmenuReminder" onclick="event.stopPropagation()" style="top:34px;left:0;right:auto">
+        <h4>REMINDER</h4>
+        <span class="chips" style="margin:0 0 8px">
+          <button class="chip" data-act="taskduechip" data-ms="${10*MIN}">10m</button>
+          <button class="chip" data-act="taskduechip" data-ms="${30*MIN}">30m</button>
+          <button class="chip" data-act="taskduechip" data-ms="${1*HOUR}">1h</button>
+          <button class="chip" data-act="taskduechip" data-ms="${3*HOUR}">3h</button>
+          <button class="chip" data-act="taskduechip" data-ms="tmrw">Tmrw 9:00</button>
+        </span>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input type="datetime-local" id="taskDueIn" value="${t.due ? toLocalInput(t.due) : ''}"
+            style="flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:calc(12.5px * var(--fs-scale));outline:none">
+          ${t.due ? `<button class="btn" data-act="taskduechip" data-ms="clear" style="padding:6px 10px;font-size:calc(12px * var(--fs-scale))">Remove</button>` : ''}
+        </div>
+      </div>
+      <div class="tmenu" id="tmenuRepeat" onclick="event.stopPropagation()" style="top:34px;left:0;right:auto">
+        <h4>REPEAT</h4>
+        <select id="taskRepeatSel" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:calc(13px * var(--fs-scale));outline:none;background:var(--panel)">
+          <option value="" ${!t.repeat?'selected':''}>None</option>
+          <option value="hourly" ${t.repeat==='hourly'?'selected':''}>Hourly</option>
+          <option value="daily" ${t.repeat==='daily'?'selected':''}>Daily</option>
+          <option value="weekly" ${t.repeat==='weekly'?'selected':''}>Weekly</option>
+        </select>
+      </div>
     </div>`;
   document.getElementById('taskTextIn').value = t.text;
 
@@ -5653,8 +5630,18 @@ function renderTaskDrawer(){
       </div>
     </div>`;
 }
-function toggleTMenu(){ document.getElementById('tmenu')?.classList.toggle('show'); }
-function closeTMenu(){ document.getElementById('tmenu')?.classList.remove('show'); }
+function toggleTMenu(id, anchor){
+  document.querySelectorAll('.tmenu').forEach(m=>{ if(m.id!==id) m.classList.remove('show'); });
+  const m = document.getElementById(id);
+  if(!m) return;
+  m.classList.toggle('show');
+  if(anchor && m.classList.contains('show')){
+    const maxLeft = m.parentElement.clientWidth - m.offsetWidth;
+    m.style.left = Math.max(0, Math.min(anchor.offsetLeft, maxLeft)) + 'px';
+  }
+}
+function closeTMenu(){ document.querySelectorAll('.tmenu.show').forEach(m=>m.classList.remove('show')); }
+document.addEventListener('click', closeTMenu);
 
 function handleTaskDrawerAct(act, btn){
   const t = taskById(drawerId);
@@ -5677,6 +5664,20 @@ function handleTaskDrawerAct(act, btn){
     }
     case 'taskprio': setTaskPriority(t.id, btn.dataset.p); break;
     case 'togglefollow': toggleTaskFollowUp(t.id); break;
+    case 'taskduechip': {
+      const v = btn.dataset.ms;
+      if(v==='clear'){ t.due = null; }
+      else if(v==='tmrw'){
+        const d = new Date(); d.setDate(d.getDate()+1); d.setHours(9,0,0,0);
+        t.due = d.getTime();
+      }else{
+        t.due = Date.now() + (+v);
+      }
+      taskNotified.delete(t.id);
+      if(t.due) t.notes.push({text:`Reminder set: ${fmtClock(t.due)}`, at:Date.now()});
+      render();
+      break;
+    }
     case 'taskdelete': deleteTask(t.id); break;
     case 'opentaskalert': {
       const id = +btn.dataset.id;
@@ -5785,6 +5786,7 @@ function doLogin(){
 /* due-time "pop": notify when a task hits its due time, and pop
    scheduled / periodic tasks into the TODO list once their time arrives */
 setInterval(()=>{
+  if(isMvp()) return;   /* no tasks in MVP1 */
   let changed = false;
   tasksData.forEach(t=>{
     if(!t.done && t.due && t.due <= Date.now() && !taskNotified.has(t.id)){
