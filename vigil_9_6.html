@@ -1847,7 +1847,7 @@
                 <span class="tt-exchev">&rsaquo;</span>
               </div>
               <div class="tt-exbody" id="tTimeBody" style="display:none">
-                <select id="tTimeSelect" onchange="onTaskTimeChange()"></select>
+                <input type="time" id="tTimeSelect" step="60" oninput="onTaskTimeChange()" onchange="onTaskTimeChange()" style="flex:1">
               </div>
 
               <div class="tt-exrow" id="tRepeatRow" onclick="toggleCalRow('repeat')">
@@ -5369,19 +5369,6 @@ function pickTaskDatePreset(kind){
   renderTaskCalGrid();
   applyComposerDateTime();
 }
-function populateTimeSelectOptions(){
-  const sel = document.getElementById('tTimeSelect');
-  if(!sel) return;
-  let html = `<option value="">No time</option>`;
-  for(let h=0; h<24; h++){
-    for(let m=0; m<60; m+=30){
-      const hh = String(h).padStart(2,'0'), mm = String(m).padStart(2,'0');
-      const label = new Date(2000,0,1,h,m).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-      html += `<option value="${hh}:${mm}">${label}</option>`;
-    }
-  }
-  sel.innerHTML = html;
-}
 function onTaskTimeChange(){ applyComposerDateTime(); }
 function applyComposerDateTime(){
   if(!calSelectedDate){
@@ -5460,8 +5447,7 @@ function updateCalSummary(){
   document.getElementById('tRepeatSummary').textContent = repeatLabel ? ('Repeat — '+repeatLabel) : 'Repeat';
   document.getElementById('tRepeatSummary').classList.toggle('set', !!repeatLabel);
   const timeVal = document.getElementById('tTimeSelect').value;
-  const timeSel = document.getElementById('tTimeSelect');
-  const timeLabel = timeVal ? timeSel.options[timeSel.selectedIndex].text : '';
+  const timeLabel = timeVal ? new Date(2000,0,1,+timeVal.split(':')[0],+timeVal.split(':')[1]).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
   document.getElementById('tTimeSummary').textContent = timeLabel ? ('Time — '+timeLabel) : 'Time';
   document.getElementById('tTimeSummary').classList.toggle('set', !!timeLabel);
 }
@@ -5490,7 +5476,6 @@ function resetTaskComposer(){
   calViewYear = now.getFullYear();
   calViewMonth = now.getMonth();
   document.getElementById('tPrio').value = 'A';
-  populateTimeSelectOptions();
   document.getElementById('tRepeatCustomN').value = '1';
   document.getElementById('tRepeatCustomUnit').value = 'days';
   ['tTimeRow','tRepeatRow'].forEach(id=>document.getElementById(id).classList.remove('open'));
