@@ -949,6 +949,13 @@
   #taskOverlay.periodic-mode #tCalPop .tt-quickrow,
   #taskOverlay.periodic-mode #tCalPop .tt-calhead, #taskOverlay.periodic-mode #tCalPop #tCalGrid,
   #taskOverlay.periodic-mode #tCalPop #tTimeRow, #taskOverlay.periodic-mode #tCalPop #tTimeBody{display:none !important;}
+  .trow.inline-add{cursor:text;background:var(--panel);}
+  .trow.inline-add input{flex:1;border:none;outline:none;background:transparent;font:inherit;font-size:calc(14px * var(--fs-scale));color:var(--text);min-width:0;}
+  .trow.inline-add .tcheck{border-style:dashed;pointer-events:none;}
+  .trow.subrow{padding-top:5px;padding-bottom:5px;padding-right:44px;}
+  .trow.subrow .ttxt{font-size:calc(13px * var(--fs-scale));color:var(--dim);}
+  .trow.subrow.done .ttxt{text-decoration:line-through;color:var(--dim2);}
+  .trow.subrow .tcheck{width:14px;height:14px;}
   .tsec-head.static:hover{color:var(--dim2);}
   .tsec-head .chev{width:12px;height:12px;transition:transform .12s;flex-shrink:0;}
   .tsec-count{font-weight:700;letter-spacing:0;}
@@ -2681,6 +2688,10 @@ function render(){
     document.getElementById('table').innerHTML = tasksPageHTML();
     renderSelbar();
     syncDrawer();
+    if(inlineAdd){
+      const inp = document.getElementById('inlineAddInput');
+      if(inp){ inp.focus(); inp.scrollIntoView({block:'nearest'}); }
+    }
     return;
   }
 
@@ -3873,6 +3884,13 @@ tableEl.addEventListener('click', e=>{
   }
   const delTile = e.target.closest('[data-deltile]');
   if(delTile){ deleteTile(+delTile.dataset.deltile); return; }
+  const subDone = e.target.closest('[data-subdone]');
+  if(subDone){
+    const [tid,si] = subDone.dataset.subdone.split(':').map(Number);
+    const st = taskById(tid)?.subtasks?.[si];
+    if(st){ st.done = !st.done; render(); }
+    return;
+  }
   const tDone = e.target.closest('[data-taskdone]');
   if(tDone){ toggleTaskDone(+tDone.dataset.taskdone); return; }
   const tFlag = e.target.closest('[data-taskflag]');
@@ -3932,6 +3950,15 @@ function removeDowntime(id){
 }
 
 tableEl.addEventListener('keydown', e=>{
+  if(e.target.id==='inlineAddInput'){
+    e.stopPropagation();
+    if(e.key==='Enter'){
+      e.preventDefault();
+      if(e.shiftKey && inlineAdd && !inlineAdd.sub && e.target.value.trim()===''){ inlineAdd.sub = true; render(); return; }
+      commitInlineAdd();
+    }else if(e.key==='Escape'){ e.preventDefault(); cancelInlineAdd(); }
+    return;
+  }
   if(e.target.id==='qaddInput' && e.key==='Enter'){
     e.preventDefault();
     const raw = e.target.value.trim();
@@ -4065,7 +4092,7 @@ document.addEventListener('keydown', e=>{
         if(keepOpen && nextId!==null && taskById(nextId)) _showDrawer('task', nextId); /* panel stays open on the neighbouring task */
         return;
       }
-      if(e.key==='Enter'){ openTaskDrawer(selectedTaskId); return; }
+      if(e.key==='Enter'){ e.preventDefault(); startInlineAdd(selectedTaskId, e.shiftKey); return; }
     }
   }
 
@@ -5115,6 +5142,44 @@ function taskSectionHead(key, label, count, addTitle, addFn, addIcon){
       ${addFn ? `<button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${addIcon||ICONS.plus}</button>` : ''}
     </div>`;
 }
+/* inline "type a new row" — Enter under a selected task adds a task, Shift+Enter a subtask */
+let inlineAdd = null;   /* {afterId, sub} */
+function inlineAddRowHTML(sub){
+  return `<div class="trow inline-add ${sub?'subrow':''}">
+    <span class="tcheck"></span>
+    <input id="inlineAddInput" dir="auto" placeholder="${sub?'Subtask...':'New task...'}" autocomplete="off">
+  </div>`;
+}
+function startInlineAdd(afterId, sub){
+  if(!taskById(afterId)) return;
+  inlineAdd = {afterId, sub:!!sub};
+  render();
+}
+function cancelInlineAdd(){
+  if(!inlineAdd) return;
+  inlineAdd = null;
+  render();
+}
+function commitInlineAdd(){
+  const inp = document.getElementById('inlineAddInput');
+  const text = inp ? inp.value.trim() : '';
+  const a = inlineAdd && taskById(inlineAdd.afterId);
+  if(!a || !text){ cancelInlineAdd(); return; }
+  if(inlineAdd.sub){
+    a.subtasks ||= [];
+    a.subtasks.push({text, done:false, at:Date.now()});
+    render();               /* stays open for the next subtask */
+    return;
+  }
+  const t = createTask({text, priority:a.priority, followUp:a.followUp});
+  if(!t){ cancelInlineAdd(); return; }
+  /* place it right below the task it was added from, then keep typing under the new one */
+  t.ord = (a.ord ?? 0) + 0.5;
+  tasksData.filter(x=>!x.done).sort((x,y)=>x.ord-y.ord).forEach((x,i)=>{ x.ord = i; });
+  selectedTaskId = t.id;
+  inlineAdd = {afterId:t.id, sub:false};
+  render();
+}
 function tasksPageHTML(){
   ensureTaskOrd();
   const q = document.getElementById('listSearch').value.trim().toLowerCase();
@@ -5145,6 +5210,13 @@ function tasksPageHTML(){
       ${dtAlert ? `<button class="ticon soon" data-taskdtremove="${dtAlert.id}" title="Alert in downtime — click to cancel" style="border:none;background:none;cursor:pointer;padding:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.346 5.353c.21 -.129 .428 -.246 .654 -.353a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3m-1 3h-13a4 4 0 0 0 2 -3v-3a6.996 6.996 0 0 1 1.273 -3.707"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><path d="M3 3l18 18"/></svg></button>` : ''}
       <button class="prio ${t.priority}" data-taskflag="${t.id}" title="Priority (click to cycle A→B→C)" style="cursor:pointer;border:none">${t.priority}</button>
     </div>`;
+    (t.subtasks||[]).forEach((st,i)=>{
+      html += `<div class="trow subrow ${st.done?'done':''}" data-task="${t.id}">
+        <span class="tcheck" data-subdone="${t.id}:${i}"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-10"/></svg></span>
+        <span class="ttxt">${st.text}</span>
+      </div>`;
+    });
+    if(inlineAdd && inlineAdd.afterId===t.id) html += inlineAddRowHTML(inlineAdd.sub);
   };
   regularUndone.forEach(renderRow);
   html += taskSectionHead('followup', 'Follow up', followUpUndone.length, 'Add follow-up task', 'openTaskModal([],{followUp:true})');
