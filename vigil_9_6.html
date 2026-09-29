@@ -941,6 +941,11 @@
   .ticon.popped{color:var(--teal);}
   .tsec-head{cursor:pointer;user-select:none;}
   .tsec-head:hover{color:var(--dim);}
+  /* periodic mode: the date popover shows the Repeat section only */
+  #taskOverlay.periodic-mode #tTarget{display:none;}
+  #taskOverlay.periodic-mode #tCalPop .tt-tabs, #taskOverlay.periodic-mode #tCalPop .tt-quickrow,
+  #taskOverlay.periodic-mode #tCalPop .tt-calhead, #taskOverlay.periodic-mode #tCalPop #tCalGrid,
+  #taskOverlay.periodic-mode #tCalPop #tTimeRow, #taskOverlay.periodic-mode #tCalPop #tTimeBody{display:none !important;}
   .tsec-head.static:hover{color:var(--dim2);}
   .tsec-head .chev{width:12px;height:12px;transition:transform .12s;flex-shrink:0;}
   .tsec-count{font-weight:700;letter-spacing:0;}
@@ -1794,7 +1799,7 @@
 <!-- Create Task modal -->
 <div class="overlay" id="taskOverlay">
   <div class="modal small">
-    <h3>Create Task</h3>
+    <h3 id="taskModalTitle">Create Task</h3>
     <div class="msub">Ctrl+1 / Ctrl+2 / Ctrl+3 sets priority A / B / C · Enter creates.</div>
     <div class="dt-target" id="tTarget"></div>
 
@@ -5161,7 +5166,7 @@ function tasksPageHTML(){
   if(!taskOrder.length && !scheduledHidden.length && q) html += `<div class="empty">No tasks match "${q}".</div>`;
   if(!tasksData.length) html += `<div class="empty">No tasks yet — type above and press Enter.</div>`;
 
-  html += taskSectionHead('periodic', 'Periodic tasks', periodicTasks.length, 'Add periodic task', 'openPeriodicModal()');
+  html += taskSectionHead('periodic', 'Periodic tasks', periodicTasks.length, 'Add periodic task', 'openTaskModal([],{periodic:true})');
   if(taskSectionsOpen.periodic) html += `
     <div class="tperiodic-list">` +
       (periodicTasks.length ? periodicTasks.map(p=>`
@@ -5524,12 +5529,22 @@ function openTaskModal(alertIds, opts){
   document.getElementById('tName').value = '';
   resetTaskComposer();
   if(opts.schedule) pickTaskDatePreset('tomorrow');
-  document.getElementById('taskOverlay').classList.add('show');
+  const ov = document.getElementById('taskOverlay');
+  ov.classList.toggle('periodic-mode', !!opts.periodic);
+  document.getElementById('taskModalTitle').textContent = opts.periodic ? 'New periodic task' : 'Create Task';
+  ov.classList.add('show');
+  if(opts.periodic){
+    /* open straight onto the Repeat options */
+    document.getElementById('tRepeatBody').style.display = 'flex';
+    document.getElementById('tRepeatRow').classList.add('open');
+    setTimeout(()=>document.getElementById('tCalBtn').click(), 60);
+  }
   setTimeout(()=>document.getElementById('tName').focus(), 50);
 }
 function closeTaskModal(){
   document.getElementById('taskOverlay').classList.remove('show');
   closeAllTtPopovers();
+  document.getElementById('taskOverlay').classList.remove('periodic-mode');
   taskTargetAlerts = [];
   taskModalFollowUp = false;
 }
@@ -5573,6 +5588,10 @@ function saveTaskModal(){
     if(!isNaN(parsed)) scheduleAt = parsed;
   }
 
+  if(!everyMs && document.getElementById('taskOverlay').classList.contains('periodic-mode')){
+    toast('Choose how often the task repeats');
+    return;
+  }
   if(everyMs){
     /* recurring — this becomes a periodic task definition, not a one-off task */
     const label = fmtPeriodicLabel(everyMs);
