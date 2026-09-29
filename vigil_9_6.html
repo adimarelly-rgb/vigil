@@ -1824,7 +1824,7 @@
     <div class="dt-target" id="tTarget"></div>
 
     <div class="tt-composer">
-      <input type="text" id="tName" class="tt-input" placeholder="What would you like to do?" dir="auto">
+      <input type="text" id="tName" autocomplete="off" class="tt-input" placeholder="What would you like to do?" dir="auto">
       <div class="tt-icons">
         <div class="tt-icon-wrap">
           <button type="button" class="tt-icon-btn" id="tCalBtn" title="Date &amp; repeat" onclick="toggleTtPop(event,'tCalPop')">
@@ -5622,10 +5622,23 @@ function repeatCustomStart(){
   const t = new Date(v).getTime();
   return isNaN(t) ? null : t;
 }
+/* stop the browser's "save info" / autofill dropdown on every text field, including ones rendered later */
+document.addEventListener('focusin', e=>{
+  const el = e.target;
+  if(el && el.tagName==='INPUT' && !el.hasAttribute('autocomplete') && !/checkbox|radio|button|submit/.test(el.type)) el.setAttribute('autocomplete','off');
+  else if(el && el.tagName==='TEXTAREA' && !el.hasAttribute('autocomplete')) el.setAttribute('autocomplete','off');
+});
 function toggleCalRow(name){
   const cap = name.charAt(0).toUpperCase()+name.slice(1);
   const row = document.getElementById('t'+cap+'Row'), body = document.getElementById('t'+cap+'Body');
   const isOpen = body.style.display !== 'none';
+  if(name==='time' && !isOpen && !calSelectedDate){
+    /* choosing a time without a day → today */
+    const n = new Date(); calSelectedDate = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    calViewYear = n.getFullYear(); calViewMonth = n.getMonth();
+    renderTaskCalGrid();
+    applyComposerDateTime();
+  }
   body.style.display = isOpen ? 'none' : 'flex';
   row.classList.toggle('open', !isOpen);
 }
