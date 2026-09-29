@@ -5599,6 +5599,8 @@ function applyComposerDateTime(){
 function onRepeatPresetChange(){
   const isCustom = document.getElementById('tRepeatPreset').value === 'custom';
   document.getElementById('tRepeatCustomRow').style.display = isCustom ? 'flex' : 'none';
+  const cs = document.getElementById('tRepeatCustomStart');
+  if(isCustom && !cs.value) cs.value = toLocalInput(Date.now());   /* Starts defaults to today */
   updateCalSummary();
 }
 function computeRepeatMs(){
@@ -5614,6 +5616,19 @@ function computeRepeatMs(){
     return n*mult;
   }
   return 0;
+}
+/* label for the chosen repeat — day/week repeats say when (time / weekday) if one was picked */
+function composerRepeatLabel(){
+  const preset = document.getElementById('tRepeatPreset').value;
+  const ms = computeRepeatMs();
+  if(!ms) return '';
+  if(preset==='hourly') return 'Every hour';
+  if(preset!=='daily' && preset!=='weekly') return fmtPeriodicLabel(ms);
+  const time = document.getElementById('tTimeSelect').value;
+  const at = time ? ' at '+time : '';
+  if(preset==='daily') return 'Every day'+at;
+  const day = calSelectedDate ? ' on '+calSelectedDate.toLocaleDateString('en-US',{weekday:'long'}) : '';
+  return 'Every week'+day+at;
 }
 function repeatCustomStart(){
   if(document.getElementById('tRepeatPreset').value !== 'custom') return null;
@@ -5666,7 +5681,7 @@ function updateCalSummary(){
   document.getElementById('tCalBtn').classList.toggle('active', !!label);
 
   const repeatMs = computeRepeatMs();
-  const repeatLabel = repeatMs ? fmtPeriodicLabel(repeatMs) : '';
+  const repeatLabel = repeatMs ? composerRepeatLabel() : '';
   document.getElementById('tRepeatSummary').textContent = repeatLabel ? ('Repeat — '+repeatLabel) : 'Repeat';
   document.getElementById('tRepeatSummary').classList.toggle('set', !!repeatLabel);
   const timeVal = document.getElementById('tTimeSelect').value;
@@ -5811,9 +5826,10 @@ function saveTaskModal(){
   }
   if(everyMs){
     /* recurring — this becomes a periodic task definition, not a one-off task */
-    const label = fmtPeriodicLabel(everyMs);
+    const label = composerRepeatLabel();
     const customStart = repeatCustomStart();
-    const nextFire = customStart || ((scheduleAt && scheduleAt>Date.now()) ? scheduleAt : Date.now()+everyMs);
+    let nextFire = customStart || scheduleAt || (Date.now()+everyMs);
+    while(nextFire <= Date.now()) nextFire += everyMs;   /* first occurrence is always in the future */
     periodicTasks.push({id:periodicSeq++, text:tagged.text, priority, everyMs, label, nextFire});
     closeTaskModal();
     selected.clear();
