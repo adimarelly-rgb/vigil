@@ -167,8 +167,14 @@
   .nav-sub.collapsed{display:none;}
   .nav-sub .nav-item{font-size:calc(14px * var(--fs-scale));padding:7px 9px;}
   .nav-sub .nav-item.active{background:var(--sel);color:#087f5b;font-weight:600;}
-  .nav-sub .nav-item .nav-del{display:none;margin-left:2px;color:var(--dim2);}
-  .nav-sub .nav-item:hover .nav-del{display:flex;}
+  /* hover actions are overlaid (not toggled with display) so the row never changes size */
+  .nav-sub .nav-item{position:relative;}
+  .nav-sub .nav-item .nav-del{position:absolute;top:50%;right:6px;transform:translateY(-50%);margin:0;
+    opacity:0;pointer-events:none;color:var(--dim2);background:var(--bg);}
+  .nav-sub .nav-item .nav-del:nth-last-of-type(2){right:30px;}
+  .nav-sub .nav-item.active .nav-del{background:var(--sel);}
+  .nav-sub .nav-item:hover .nav-del{opacity:1;pointer-events:auto;}
+  .nav-sub .nav-item:hover .count{visibility:hidden;}
   .nav-sub .nav-item .nav-del:hover{background:var(--red-bg);color:var(--red);}
   .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
   .moon{width:14px;height:14px;flex-shrink:0;color:#5f3dc4;display:flex;}
@@ -2016,7 +2022,7 @@
     <div class="confirm-body" id="confirmBody"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeConfirmModal()">Cancel</button>
-      <button class="btn danger-solid" onclick="doDeletePage()">Delete page</button>
+      <button class="btn danger-solid" id="confirmOKBtn" onclick="doDeletePage()">Delete page</button>
     </div>
   </div>
 </div>
@@ -3640,6 +3646,7 @@ function confirmDeletePage(id){
   const nGroups = p.groups.length;
   const nAlerts = countForCustomPage(p);
   document.getElementById('confirmTitle').textContent = `Delete "${p.name}"?`;
+  document.getElementById('confirmOKBtn').textContent = 'Delete page';
   document.getElementById('confirmBody').innerHTML =
     `This will permanently remove the page and its <b>${nGroups} group${nGroups===1?'':'s'}</b>.<br>` +
     `The <b>${nAlerts} alert${nAlerts===1?'':'s'}</b> it collects will not be deleted — they stay in All Alerts.<br><br>` +
@@ -3649,11 +3656,32 @@ function confirmDeletePage(id){
 function closeConfirmModal(){
   document.getElementById('confirmOverlay').classList.remove('show');
   pendingDeletePage = null;
+  pendingClearDone = false;
+}
+let pendingClearDone = false;
+function confirmClearDone(){
+  const n = tasksData.filter(t=>t.done).length;
+  if(!n) return;
+  pendingClearDone = true;
+  document.getElementById('confirmTitle').textContent = 'Are you sure?';
+  document.getElementById('confirmBody').innerHTML =
+    `This will permanently delete all <b>${n} done task${n===1?'':'s'}</b>.<br><br>This action cannot be undone.`;
+  document.getElementById('confirmOKBtn').textContent = 'Delete all';
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function doClearDone(){
+  const n = tasksData.filter(t=>t.done).length;
+  tasksData = tasksData.filter(t=>!t.done);
+  if(drawerType==='task' && drawerId!==null && !taskById(drawerId)) closeDrawer();
+  if(selectedTaskId!==null && !taskById(selectedTaskId)) selectedTaskId = null;
+  render();
+  toast(`${n} done task${n===1?'':'s'} deleted`);
 }
 document.getElementById('confirmOverlay').addEventListener('mousedown', e=>{
   if(e.target===e.currentTarget) closeConfirmModal();
 });
 function doDeletePage(){
+  if(pendingClearDone){ closeConfirmModal(); doClearDone(); return; }
   const p = customPages.find(x=>x.id===pendingDeletePage);
   closeConfirmModal();
   if(!p) return;
@@ -5101,13 +5129,13 @@ function toggleTaskSection(key){
   taskSectionsOpen[key] = !taskSectionsOpen[key];
   render();
 }
-function taskSectionHead(key, label, count, addTitle, addFn){
+function taskSectionHead(key, label, count, addTitle, addFn, addIcon){
   const open = taskSectionsOpen[key];
   return `<div class="tperiodic-head tsec-head" onclick="toggleTaskSection('${key}')" title="${open?'Collapse':'Expand'}">
       <svg class="chev" style="transform:rotate(${open?'90':'180'}deg)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
       <span>${label}</span>
       ${count ? `<span class="tsec-count">(${count})</span>` : ''}
-      ${addFn ? `<button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${ICONS.plus}</button>` : ''}
+      ${addFn ? `<button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${addIcon||ICONS.plus}</button>` : ''}
     </div>`;
 }
 function tasksPageHTML(){
@@ -5180,7 +5208,7 @@ function tasksPageHTML(){
     `</div>`;
 
   if(done.length){
-    html += taskSectionHead('done', 'Done', done.length);
+    html += taskSectionHead('done', 'Done', done.length, 'Delete all done tasks', 'confirmClearDone()', ICONS.trash);
     if(taskSectionsOpen.done) done.forEach(renderRow);
   }
   html += `</div>`;
