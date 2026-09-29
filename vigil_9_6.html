@@ -5441,6 +5441,7 @@ function toggleTaskNextShift(id){
   const t = taskById(id);
   if(!t) return;
   t.nextShift = !t.nextShift;
+  if(t.nextShift) t.followUp = false;
   t.notes.push({text: t.nextShift ? 'Tagged for next shift' : 'Next-shift tag removed', at:Date.now()});
   render();
   toast(t.nextShift ? '🌙 Moved to For next shift' : 'Next-shift tag removed');
@@ -5449,6 +5450,7 @@ function toggleTaskFollowUp(id){
   const t = taskById(id);
   if(!t) return;
   t.followUp = !t.followUp;
+  if(t.followUp) t.nextShift = false;
   t.notes.push({text: t.followUp ? 'Tagged to follow up' : 'Follow-up tag removed', at:Date.now()});
   render();
   toast(t.followUp ? '🕐 Tagged to follow up' : 'Follow-up tag removed');
@@ -5675,13 +5677,22 @@ let tagKbdIdx = 0;
 function hiTagRow(){
   document.querySelectorAll('#tTagPop .tt-tagrow').forEach((r,i)=>r.classList.toggle('kbd-hi', i===tagKbdIdx));
 }
+/* the two tags are mutually exclusive; picking one applies it and closes the dropdown */
 function toggleComposerFollowUp(){
   taskModalFollowUp = !taskModalFollowUp;
+  if(taskModalFollowUp) taskModalNextShift = false;
   updateTagUI();
+  finishTagPick();
+}
+function finishTagPick(){
+  closeAllTtPopovers();
+  document.getElementById('tName').focus();
 }
 function toggleComposerNextShift(){
   taskModalNextShift = !taskModalNextShift;
+  if(taskModalNextShift) taskModalFollowUp = false;
   updateTagUI();
+  finishTagPick();
 }
 function updateTagUI(){
   const tb = document.getElementById('tTagBtn');
@@ -5804,7 +5815,7 @@ function saveTaskModal(){
     due,
     repeat: null,
     alertIds: taskTargetAlerts,
-    followUp: tagged.followUp || taskModalFollowUp,
+    followUp: (tagged.followUp || taskModalFollowUp) && !taskModalNextShift,
     nextShift: taskModalNextShift,
     scheduledFor: (scheduleAt && scheduleAt>Date.now()) ? scheduleAt : null,
   });
