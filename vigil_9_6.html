@@ -1267,8 +1267,10 @@
       <div class="kbd-row"><span class="desc">Toggle done</span><kbd>x</kbd></div>
       <div class="kbd-row"><span class="desc">Toggle follow-up</span><kbd>f</kbd></div>
       <div class="kbd-row"><span class="desc">Schedule for later</span><kbd>t</kbd></div>
+      <div class="kbd-row"><span class="desc">Toggle for next shift</span><kbd>n</kbd></div>
+      <div class="kbd-row"><span class="desc">New task: next shift</span><kbd>Alt+N</kbd></div>
       <div class="kbd-row"><span class="desc">New task below</span><kbd>Enter</kbd></div>
-      <div class="kbd-row"><span class="desc">New subtask</span><kbd>Shift+Enter</kbd></div>
+      <div class="kbd-row"><span class="desc">New subtask (nests under the selected row)</span><kbd>Shift+Enter</kbd></div>
       <div class="kbd-row"><span class="desc">New task: date / repeat</span><kbd>Alt+S</kbd></div>
       <div class="kbd-row"><span class="desc">New task: follow up</span><kbd>Alt+T</kbd></div>
       <div class="kbd-row"><span class="desc">Delete task</span><kbd>Del</kbd></div>
@@ -1813,7 +1815,7 @@
 <div class="overlay" id="taskOverlay">
   <div class="modal small">
     <h3 id="taskModalTitle">Create Task</h3>
-    <div class="msub">Ctrl+1/2/3 priority · Alt+S date &amp; repeat · Alt+T follow up · Enter creates.</div>
+    <div class="msub">Ctrl+1/2/3 priority · Alt+S date &amp; repeat · Alt+T follow up · Alt+N next shift · Enter creates.</div>
     <div class="dt-target" id="tTarget"></div>
 
     <div class="tt-composer">
@@ -1922,10 +1924,14 @@
           <button type="button" class="tt-icon-btn" id="tTagBtn" title="Labels" onclick="toggleTtPop(event,'tTagPop')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41L11 3.83A2 2 0 009.59 3.24L4 3a1 1 0 00-1 1l.24 5.59a2 2 0 00.58 1.42l9.59 9.58a2 2 0 002.83 0l4.35-4.35a2 2 0 000-2.83z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
           </button>
-          <div class="tt-pop" id="tTagPop" style="width:150px">
+          <div class="tt-pop" id="tTagPop" style="width:190px">
             <button type="button" class="tt-tagrow" id="tFollowUpRow" onclick="toggleComposerFollowUp()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
               לעקוב <span class="tt-check">&check;</span>
+            </button>
+            <button type="button" class="tt-tagrow" id="tNextShiftRow" onclick="toggleComposerNextShift()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+              For next shift <span class="tt-check">&check;</span>
             </button>
           </div>
         </div>
@@ -3889,15 +3895,14 @@ tableEl.addEventListener('click', e=>{
   if(delTile){ deleteTile(+delTile.dataset.deltile); return; }
   const subCol = e.target.closest('[data-subcollapse]');
   if(subCol){
-    const t = taskById(+subCol.dataset.subcollapse);
-    if(t){ t.subCollapsed = !t.subCollapsed; render(); }
+    const k = parseSubKey(subCol.dataset.subcollapse), n = getSubNode(k.tid, k.path);
+    if(n){ n.subCollapsed = !n.subCollapsed; render(); }
     return;
   }
   const subDone = e.target.closest('[data-subdone]');
   if(subDone){
-    const [tid,si] = subDone.dataset.subdone.split(':').map(Number);
-    const st = taskById(tid)?.subtasks?.[si];
-    if(st){ st.done = !st.done; render(); }
+    const k = parseSubKey(subDone.dataset.subdone), n = getSubNode(k.tid, k.path);
+    if(n){ n.done = !n.done; render(); }
     return;
   }
   const tDone = e.target.closest('[data-taskdone]');
@@ -3906,8 +3911,16 @@ tableEl.addEventListener('click', e=>{
   if(tFlag){ cycleTaskPriority(+tFlag.dataset.taskflag); return; }
   const tDtRemove = e.target.closest('[data-taskdtremove]');
   if(tDtRemove){ confirmCancelDowntime(+tDtRemove.dataset.taskdtremove); return; }
+  const subRow = e.target.closest('[data-subpath]');
+  if(subRow){
+    const k = parseSubKey(subRow.dataset.subpath);
+    selectedTaskId = k.tid; selectedSub = k.path;
+    openTaskDrawer(k.tid);
+    return;
+  }
   const tRow = e.target.closest('[data-task]');
   if(tRow){
+    selectedSub = null;
     selectedTaskId = +tRow.dataset.task;
     openTaskDrawer(selectedTaskId);
     return;
@@ -3963,7 +3976,7 @@ tableEl.addEventListener('keydown', e=>{
     e.stopPropagation();
     if(e.key==='Enter'){
       e.preventDefault();
-      if(e.shiftKey && inlineAdd && !inlineAdd.sub && e.target.value.trim()===''){ inlineAdd.sub = true; render(); return; }
+      if(e.shiftKey && inlineAdd && inlineAdd.kind==='sibling' && e.target.value.trim()===''){ inlineAdd.kind = 'child'; taskById(inlineAdd.tid) && (getSubNode(inlineAdd.tid, inlineAdd.path).subCollapsed = false); render(); return; }
       commitInlineAdd();
     }else if(e.key==='Escape'){ e.preventDefault(); cancelInlineAdd(); }
     return;
@@ -4051,11 +4064,14 @@ document.addEventListener('keydown', e=>{
     return;
   }
   /* Alt+S opens the date / repeat popover, Alt+T toggles the follow-up tag (Create Task modal; by key position so it works in any layout) */
-  if(e.altKey && !e.ctrlKey && !e.metaKey && (e.code==='KeyS' || e.code==='KeyT') && document.getElementById('taskOverlay').classList.contains('show')){
+  if(e.altKey && !e.ctrlKey && !e.metaKey && (e.code==='KeyS' || e.code==='KeyT' || e.code==='KeyN') && document.getElementById('taskOverlay').classList.contains('show')){
     e.preventDefault();
     if(e.code==='KeyS'){
       if(!document.getElementById('tCalPop').classList.contains('show')) document.getElementById('tCalBtn').click();
       else closeAllTtPopovers();
+    }else if(e.code==='KeyN'){
+      toggleComposerNextShift();
+      toast(taskModalNextShift ? 'For next shift: on' : 'For next shift: off');
     }else{
       toggleComposerFollowUp();
       toast(taskModalFollowUp ? 'Follow up: on' : 'Follow up: off');
@@ -4087,15 +4103,26 @@ document.addEventListener('keydown', e=>{
       openTaskModal([]);
       return;
     }
+    if(selectedSub && !getSubNode(selectedTaskId, selectedSub)) selectedSub = null;
     if(e.key==='ArrowDown' || e.key==='ArrowUp'){
       e.preventDefault();
-      if(!taskOrder.length) return;
-      let ni = e.key==='ArrowDown' ? idx+1 : idx-1;
-      if(idx===-1) ni = e.key==='ArrowDown' ? 0 : taskOrder.length-1;
-      ni = Math.max(0, Math.min(taskOrder.length-1, ni));
-      selectedTaskId = taskOrder[ni];
+      if(!navItems.length) return;
+      const cur = navItems.findIndex(n=>n.tid===selectedTaskId && pathStr(n.path)===pathStr(selectedSub||[]));
+      let ni = e.key==='ArrowDown' ? cur+1 : cur-1;
+      if(cur===-1) ni = e.key==='ArrowDown' ? 0 : navItems.length-1;
+      ni = Math.max(0, Math.min(navItems.length-1, ni));
+      const target = navItems[ni];
+      selectedTaskId = target.tid;
+      selectedSub = target.path.length ? target.path : null;
       if(drawerId!==null && drawerType==='task') _showDrawer('task', selectedTaskId); /* keep the side panel following the selection */
       else render();
+      return;
+    }
+    if(selectedSub && selectedTaskId!==null){
+      /* a subtask is selected: only its own actions apply */
+      if(e.key==='x'){ const n = getSubNode(selectedTaskId, selectedSub); n.done = !n.done; render(); return; }
+      if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); deleteSub(selectedTaskId, selectedSub); return; }
+      if(e.key==='Enter'){ e.preventDefault(); startInlineAdd(selectedTaskId, selectedSub, e.shiftKey ? 'child' : 'sibling'); return; }
       return;
     }
     if(selectedTaskId!==null && taskById(selectedTaskId)){
@@ -4113,7 +4140,8 @@ document.addEventListener('keydown', e=>{
         if(keepOpen && nextId!==null && taskById(nextId)) _showDrawer('task', nextId); /* panel stays open on the neighbouring task */
         return;
       }
-      if(e.key==='Enter'){ e.preventDefault(); startInlineAdd(selectedTaskId, e.shiftKey); return; }
+      if(e.key==='Enter'){ e.preventDefault(); startInlineAdd(selectedTaskId, [], e.shiftKey ? 'child' : 'sibling'); return; }
+      if(e.key==='n' || e.code==='KeyN'){ toggleTaskNextShift(selectedTaskId); return; }
     }
   }
 
@@ -4206,6 +4234,7 @@ function toggleSidebar(){
 }
 
 function _showDrawer(type, id){
+  if(type==='task' && selectedTaskId!==id) selectedSub = null;
   drawerId = id;
   drawerType = type;
   if(type==='alert'){ drawerView = 'main'; detailsOpen = false; editingComment = false; }
@@ -5149,7 +5178,7 @@ function insertTaskByPriority(t){
 }
 
 /* collapsible section headers on the Tasks page */
-const taskSectionsOpen = {followup:true, scheduled:false, periodic:false, done:true};
+const taskSectionsOpen = {followup:true, nextshift:false, scheduled:false, periodic:false, done:true};
 function toggleTaskSection(key){
   taskSectionsOpen[key] = !taskSectionsOpen[key];
   render();
@@ -5163,18 +5192,48 @@ function taskSectionHead(key, label, count, addTitle, addFn, addIcon){
       ${addFn ? `<button class="mini-btn" title="${addTitle}" onclick="event.stopPropagation();${addFn}">${addIcon||ICONS.plus}</button>` : ''}
     </div>`;
 }
-/* inline "type a new row" — Enter under a selected task adds a task, Shift+Enter a subtask */
-let inlineAdd = null;   /* {afterId, sub} */
-function inlineAddRowHTML(sub){
-  return `<div class="trow inline-add ${sub?'subrow':''}">
+/* inline "type a new row" — Enter under the selected row adds a sibling, Shift+Enter adds a child (subtasks nest without limit) */
+let inlineAdd = null;      /* {tid, path:[…], kind:'sibling'|'child'}  path [] = the task itself */
+let selectedSub = null;    /* path of the selected subtask inside selectedTaskId, or null */
+let navItems = [];         /* visible rows in order, for arrow-key navigation */
+const pathStr = p => p.join('.');
+const subKey = (tid,path) => tid+':'+pathStr(path);
+function parseSubKey(k){ const [a,b] = k.split(':'); return {tid:+a, path: b ? b.split('.').map(Number) : []}; }
+function getSubNode(tid,path){
+  let n = taskById(tid);
+  for(const i of path){ n = n && (n.subtasks||[])[i]; }
+  return n || null;
+}
+function inlineAddRowHTML(isSub, depth){
+  return `<div class="trow inline-add ${isSub?'subrow':''}" ${isSub?`style="padding-right:${44+depth*22}px"`:''}>
     <span class="tcheck"></span>
-    <input id="inlineAddInput" dir="auto" placeholder="${sub?'Subtask...':'New task...'}" autocomplete="off">
+    <input id="inlineAddInput" dir="auto" placeholder="${isSub?'Subtask...':'New task...'}" autocomplete="off">
   </div>`;
 }
-function startInlineAdd(afterId, sub){
-  if(!taskById(afterId)) return;
-  inlineAdd = {afterId, sub:!!sub};
-  if(sub) taskById(afterId).subCollapsed = false;
+function subTreeHTML(t, node, path, depth){
+  let out = '';
+  if(!node.subCollapsed) (node.subtasks||[]).forEach((st,i)=>{
+    const p = [...path, i], key = subKey(t.id,p);
+    const sel = selectedSub && selectedTaskId===t.id && pathStr(selectedSub)===pathStr(p);
+    navItems.push({tid:t.id, path:p});
+    const kids = (st.subtasks||[]).length;
+    out += `<div class="trow subrow ${st.done?'done':''} ${sel?'sel':''}" data-task="${t.id}" data-subpath="${key}" style="padding-right:${44+depth*22}px">
+      <span class="tcheck" data-subdone="${key}"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-10"/></svg></span>
+      ${kids ? `<button class="mini-btn subcollapse" data-subcollapse="${key}" title="${st.subCollapsed?'Show':'Hide'} subtasks (${kids})" style="width:20px;height:20px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform:rotate(${st.subCollapsed?'180':'90'}deg);transition:transform .12s"><path d="M9 6l6 6-6 6"/></svg></button>` : ''}
+      <span class="ttxt">${st.text}</span>
+    </div>` + subTreeHTML(t, st, p, depth+1);
+  });
+  if(inlineAdd && inlineAdd.tid===t.id && pathStr(inlineAdd.path)===pathStr(path)){
+    const child = inlineAdd.kind==='child';
+    out += inlineAddRowHTML(child || path.length>0, child ? depth : depth-1);
+  }
+  return out;
+}
+function startInlineAdd(tid, path, kind){
+  const node = getSubNode(tid, path);
+  if(!node) return;
+  inlineAdd = {tid, path, kind};
+  if(kind==='child') node.subCollapsed = false;
   render();
 }
 function cancelInlineAdd(){
@@ -5185,30 +5244,47 @@ function cancelInlineAdd(){
 function commitInlineAdd(){
   const inp = document.getElementById('inlineAddInput');
   const text = inp ? inp.value.trim() : '';
-  const a = inlineAdd && taskById(inlineAdd.afterId);
-  if(!a || !text){ cancelInlineAdd(); return; }
-  if(inlineAdd.sub){
-    a.subtasks ||= [];
-    a.subtasks.push({text, done:false, at:Date.now()});
-    a.subCollapsed = false;
-    inlineAdd = null;       /* Enter saved it — the next Enter (on the same task) starts the next row */
-    selectedTaskId = a.id;
-    render();
-    return;
+  const ia = inlineAdd;
+  const task = ia && taskById(ia.tid);
+  if(!task || !text){ cancelInlineAdd(); return; }
+  inlineAdd = null;          /* Enter saved it — the next Enter (on the new row) starts the next one */
+  const mk = () => ({text, done:false, at:Date.now()});
+  if(ia.path.length===0 && ia.kind==='sibling'){
+    const t = createTask({text, priority:task.priority, followUp:task.followUp, nextShift:task.nextShift});
+    if(!t){ render(); return; }
+    t.ord = (task.ord ?? 0) + 0.5;   /* right below the task it was added from */
+    tasksData.filter(x=>!x.done).sort((x,y)=>x.ord-y.ord).forEach((x,i)=>{ x.ord = i; });
+    selectedTaskId = t.id; selectedSub = null;
+  }else if(ia.kind==='child'){
+    const node = getSubNode(ia.tid, ia.path);
+    node.subtasks ||= [];
+    node.subtasks.push(mk());
+    node.subCollapsed = false;
+    selectedTaskId = ia.tid; selectedSub = [...ia.path, node.subtasks.length-1];
+  }else{
+    const parentPath = ia.path.slice(0,-1);
+    const parent = getSubNode(ia.tid, parentPath);
+    const at = ia.path[ia.path.length-1] + 1;
+    parent.subtasks.splice(at, 0, mk());
+    selectedTaskId = ia.tid; selectedSub = [...parentPath, at];
   }
-  const t = createTask({text, priority:a.priority, followUp:a.followUp});
-  if(!t){ cancelInlineAdd(); return; }
-  /* place it right below the task it was added from */
-  t.ord = (a.ord ?? 0) + 0.5;
-  tasksData.filter(x=>!x.done).sort((x,y)=>x.ord-y.ord).forEach((x,i)=>{ x.ord = i; });
-  selectedTaskId = t.id;
-  inlineAdd = null;         /* Enter saved it — the next Enter (with the new task selected) adds another */
   render();
+}
+function deleteSub(tid, path){
+  const parentPath = path.slice(0,-1), i = path[path.length-1];
+  const parent = getSubNode(tid, parentPath);
+  if(!parent || !parent.subtasks) return;
+  const [gone] = parent.subtasks.splice(i,1);
+  if(!parent.subtasks.length) delete parent.subtasks;
+  selectedSub = parent.subtasks ? [...parentPath, Math.min(i, parent.subtasks.length-1)] : (parentPath.length ? parentPath : null);
+  render();
+  toast(`Subtask deleted: "${gone.text}"`);
 }
 function tasksPageHTML(){
   ensureTaskOrd();
   const q = document.getElementById('listSearch').value.trim().toLowerCase();
   taskOrder = [];
+  navItems = [];
   let html = `<div dir="rtl">
     <div class="tperiodic-head tsec-head static" style="margin-top:0;border-top:none;cursor:default">
       <span>TODO</span>
@@ -5218,17 +5294,19 @@ function tasksPageHTML(){
   const now = Date.now();
   const isHiddenScheduled = t => !t.done && t.scheduledFor && t.scheduledFor > now;
   const scheduledHidden = vis.filter(isHiddenScheduled).sort((x,y)=>x.scheduledFor-y.scheduledFor);
-  const regularUndone = vis.filter(t=>!t.done && !t.followUp && !isHiddenScheduled(t)).sort((x,y)=>x.ord-y.ord);
-  const followUpUndone = vis.filter(t=>!t.done && t.followUp && !isHiddenScheduled(t)).sort((x,y)=>x.ord-y.ord);
+  const nextShiftUndone = vis.filter(t=>!t.done && t.nextShift && !isHiddenScheduled(t)).sort((x,y)=>x.ord-y.ord);
+  const regularUndone = vis.filter(t=>!t.done && !t.followUp && !t.nextShift && !isHiddenScheduled(t)).sort((x,y)=>x.ord-y.ord);
+  const followUpUndone = vis.filter(t=>!t.done && t.followUp && !t.nextShift && !isHiddenScheduled(t)).sort((x,y)=>x.ord-y.ord);
   const done = vis.filter(t=>t.done).sort((x,y)=>y.createdAt-x.createdAt);
 
   const renderRow = t=>{
     taskOrder.push(t.id);
+    navItems.push({tid:t.id, path:[]});
     const dtAlert = t.alertIds.map(id=>alerts.find(a=>a.id===id)).find(a=>a && a.status==='downtime');
-    html += `<div class="trow ${t.done?'done':''} ${selectedTaskId===t.id?'sel':''}" data-task="${t.id}">
+    html += `<div class="trow ${t.done?'done':''} ${selectedTaskId===t.id && !selectedSub?'sel':''}" data-task="${t.id}">
       <span class="tdrag" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 6h10M7 12h10M7 18h10"/></svg></span>
       <span class="tcheck" data-taskdone="${t.id}"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-10"/></svg></span>
-      ${(t.subtasks||[]).length ? `<button class="mini-btn subcollapse" data-subcollapse="${t.id}" title="${t.subCollapsed?'Show':'Hide'} subtasks (${t.subtasks.length})" style="width:20px;height:20px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform:rotate(${t.subCollapsed?'180':'90'}deg);transition:transform .12s"><path d="M9 6l6 6-6 6"/></svg></button>` : ''}
+      ${(t.subtasks||[]).length ? `<button class="mini-btn subcollapse" data-subcollapse="${subKey(t.id,[])}" title="${t.subCollapsed?'Show':'Hide'} subtasks (${t.subtasks.length})" style="width:20px;height:20px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform:rotate(${t.subCollapsed?'180':'90'}deg);transition:transform .12s"><path d="M9 6l6 6-6 6"/></svg></button>` : ''}
       <span class="ttxt">${t.text}</span>
       ${t.followUp ? `<svg class="ticon follow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><title>Follow up</title></svg>` : ''}
       ${t.wasScheduled ? `<svg class="ticon popped" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/><title>Was scheduled</title></svg>` : ''}
@@ -5236,19 +5314,18 @@ function tasksPageHTML(){
       ${dtAlert ? `<button class="ticon soon" data-taskdtremove="${dtAlert.id}" title="Alert in downtime — click to cancel" style="border:none;background:none;cursor:pointer;padding:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.346 5.353c.21 -.129 .428 -.246 .654 -.353a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3m-1 3h-13a4 4 0 0 0 2 -3v-3a6.996 6.996 0 0 1 1.273 -3.707"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><path d="M3 3l18 18"/></svg></button>` : ''}
       <button class="prio ${t.priority}" data-taskflag="${t.id}" title="Priority (click to cycle A→B→C)" style="cursor:pointer;border:none">${t.priority}</button>
     </div>`;
-    if(!t.subCollapsed) (t.subtasks||[]).forEach((st,i)=>{
-      html += `<div class="trow subrow ${st.done?'done':''}" data-task="${t.id}">
-        <span class="tcheck" data-subdone="${t.id}:${i}"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4 10-10"/></svg></span>
-        <span class="ttxt">${st.text}</span>
-      </div>`;
-    });
-    if(inlineAdd && inlineAdd.afterId===t.id) html += inlineAddRowHTML(inlineAdd.sub);
+    html += subTreeHTML(t, t, [], 0);
   };
   regularUndone.forEach(renderRow);
   html += taskSectionHead('followup', 'Follow up', followUpUndone.length, 'Add follow-up task', 'openTaskModal([],{followUp:true})');
   if(taskSectionsOpen.followup){
     if(followUpUndone.length) followUpUndone.forEach(renderRow);
     else html += `<div class="empty" style="padding:10px 14px">No follow-up tasks.</div>`;
+  }
+
+  if(nextShiftUndone.length){
+    html += taskSectionHead('nextshift', 'For next shift', nextShiftUndone.length, 'Add task for next shift', 'openTaskModal([],{nextShift:true})');
+    if(taskSectionsOpen.nextshift) nextShiftUndone.forEach(renderRow);
   }
 
   html += taskSectionHead('scheduled', 'Scheduled', scheduledHidden.length, 'Add scheduled task', 'openTaskModal([],{schedule:true})');
@@ -5288,12 +5365,13 @@ function tasksPageHTML(){
   return html;
 }
 
-function createTask({text, priority='C', due=null, repeat=null, alertIds=[], followUp=false, scheduledFor=null}){
+function createTask({text, priority='C', due=null, repeat=null, alertIds=[], followUp=false, nextShift=false, scheduledFor=null}){
   if(!text) return null;
   const t = {id:taskSeq++, text, done:false, priority, due, repeat,
-    followUp, scheduledFor, wasScheduled:false,
+    followUp, nextShift, scheduledFor, wasScheduled:false,
     alertIds:[...alertIds], notes:[{text:'Task created', at:Date.now()}], links:[], createdAt:Date.now()};
   if(followUp) t.notes.push({text:'Tagged to follow up', at:Date.now()});
+  if(nextShift) t.notes.push({text:'Tagged for next shift', at:Date.now()});
   if(scheduledFor) t.notes.push({text:`Scheduled for ${fmtDue(scheduledFor)}`, at:Date.now()});
   tasksData.push(t);
   insertTaskByPriority(t);
@@ -5348,6 +5426,14 @@ function clearSchedule(){
   toast('Schedule removed');
 }
 
+function toggleTaskNextShift(id){
+  const t = taskById(id);
+  if(!t) return;
+  t.nextShift = !t.nextShift;
+  t.notes.push({text: t.nextShift ? 'Tagged for next shift' : 'Next-shift tag removed', at:Date.now()});
+  render();
+  toast(t.nextShift ? '🌙 Moved to For next shift' : 'Next-shift tag removed');
+}
 function toggleTaskFollowUp(id){
   const t = taskById(id);
   if(!t) return;
@@ -5395,6 +5481,7 @@ function deleteTask(id){
 
 /* ---- Create Task modal: TickTick-style composer ---- */
 let taskModalFollowUp = false;
+let taskModalNextShift = false;
 let calViewYear, calViewMonth, calSelectedDate;
 
 function toggleTtPop(event, popId){
@@ -5577,9 +5664,14 @@ function toggleComposerFollowUp(){
   taskModalFollowUp = !taskModalFollowUp;
   updateTagUI();
 }
+function toggleComposerNextShift(){
+  taskModalNextShift = !taskModalNextShift;
+  updateTagUI();
+}
 function updateTagUI(){
-  document.getElementById('tTagBtn').classList.toggle('active', taskModalFollowUp);
+  document.getElementById('tTagBtn').classList.toggle('active', taskModalFollowUp || taskModalNextShift);
   document.getElementById('tFollowUpRow').classList.toggle('selected', taskModalFollowUp);
+  document.getElementById('tNextShiftRow').classList.toggle('selected', taskModalNextShift);
 }
 function resetTaskComposer(){
   const now = new Date();
@@ -5601,6 +5693,7 @@ function openTaskModal(alertIds, opts){
   opts = opts || {};
   taskTargetAlerts = alertIds || [];
   taskModalFollowUp = !!opts.followUp;
+  taskModalNextShift = !!opts.nextShift;
   const targets = alerts.filter(a=>taskTargetAlerts.includes(a.id));
   document.getElementById('tTarget').innerHTML = targets.length
     ? (targets.length===1
@@ -5628,6 +5721,7 @@ function closeTaskModal(){
   document.getElementById('taskOverlay').classList.remove('periodic-mode');
   taskTargetAlerts = [];
   taskModalFollowUp = false;
+  taskModalNextShift = false;
 }
 document.getElementById('taskOverlay').addEventListener('mousedown', e=>{
   if(e.target===e.currentTarget) closeTaskModal();
@@ -5693,6 +5787,7 @@ function saveTaskModal(){
     repeat: null,
     alertIds: taskTargetAlerts,
     followUp: tagged.followUp || taskModalFollowUp,
+    nextShift: taskModalNextShift,
     scheduledFor: (scheduleAt && scheduleAt>Date.now()) ? scheduleAt : null,
   });
   closeTaskModal();
@@ -5728,6 +5823,10 @@ function renderTaskDrawer(){
       <button class="tchip ${t.followUp?'follow-on':''}" data-act="togglefollow" title="Toggle follow-up (keyboard: F when this task is selected in the list)" style="cursor:pointer;border:${t.followUp?'1px solid var(--indigo)':'1px solid var(--border)'};background:${t.followUp?'#edf1ff':'var(--bg)'};color:${t.followUp?'var(--indigo)':'var(--dim)'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
         Follow up
+      </button>
+      <button class="tchip ${t.nextShift?'follow-on':''}" data-act="togglenextshift" title="Toggle for next shift (keyboard: N when this task is selected in the list)" style="cursor:pointer;border:${t.nextShift?'1px solid var(--violet)':'1px solid var(--border)'};background:${t.nextShift?'#f3eeff':'var(--bg)'};color:${t.nextShift?'var(--violet)':'var(--dim)'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        For next shift
       </button>
       <button class="tchip ${t.scheduledFor?'follow-on':''}" onclick="event.stopPropagation();openScheduleModal(${t.id})" title="Schedule for later — hide from TODO until then (keyboard: T when this task is selected in the list)" style="cursor:pointer;border:${t.scheduledFor?'1px solid var(--teal)':'1px solid var(--border)'};background:${t.scheduledFor?'var(--green-bg)':'var(--bg)'};color:${t.scheduledFor?'var(--teal)':'var(--dim)'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/></svg>
@@ -5831,6 +5930,7 @@ function handleTaskDrawerAct(act, btn){
     }
     case 'taskprio': setTaskPriority(t.id, btn.dataset.p); break;
     case 'togglefollow': toggleTaskFollowUp(t.id); break;
+    case 'togglenextshift': toggleTaskNextShift(t.id); break;
     case 'taskdelete': deleteTask(t.id); break;
     case 'opentaskalert': {
       const id = +btn.dataset.id;
