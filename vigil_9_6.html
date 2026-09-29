@@ -4075,7 +4075,8 @@ document.addEventListener('keydown', e=>{
   }
   if(e.key==='Escape'){ closeGroupsModal(); closeDupGroupModal(); closeDupPageModal(); closePageModal(); closeConfirmModal(); closeDtCancelModal(); closeDtModal(); closeIncModal(); closeTaskModal(); closeTileModal(); closeTilePop(); closeKbdPop(); closeSettingsModal(); closeLogoutModal(); closePeriodicModal(); closeScheduleModal(); closeDrawer(); }
   if(e.key==='Enter'){
-    if(document.getElementById('pageOverlay').classList.contains('show')) savePage();
+    if(document.activeElement && document.activeElement.id==='tTimeSelect'){ closeAllTtPopovers(); document.getElementById('tName').focus(); }
+    else if(document.getElementById('pageOverlay').classList.contains('show')) savePage();
     else if(document.getElementById('dtOverlay').classList.contains('show')) applyDowntime();
     else if(document.getElementById('taskOverlay').classList.contains('show') && document.activeElement && document.activeElement.id==='tName') saveTaskModal();
   }
@@ -5371,6 +5372,17 @@ function pickTaskDatePreset(kind){
 }
 function onTaskTimeChange(){ applyComposerDateTime(); }
 function applyComposerDateTime(){
+  const tv = document.getElementById('tTimeSelect').value;
+  if(!calSelectedDate && tv){
+    /* a time with no date: use today, or tomorrow if that time already passed */
+    const [h,mn] = tv.split(':');
+    const d = new Date(); d.setHours(+h, +mn, 0, 0);
+    if(d.getTime() <= Date.now()) d.setDate(d.getDate()+1);
+    d.setHours(0,0,0,0);
+    calSelectedDate = d;
+    calViewYear = d.getFullYear(); calViewMonth = d.getMonth();
+    renderTaskCalGrid();
+  }
   if(!calSelectedDate){
     document.getElementById('tScheduleAt').value = '';
   }else{
