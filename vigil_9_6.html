@@ -21,6 +21,8 @@
     --dt-blue:#3a5a83; --dt-blue-bg:#eef2f7;
     --indigo:#4263eb;
     --violet:#7048e8;
+    --tag-follow:#7048e8; --tag-follow-bg:#f3eeff;
+    --tag-shift:#d6336c; --tag-shift-bg:#fff0f6;
     --sel:#e6fcf5; --sel-border:#63e6be;
     --radius:10px;
     --fs-scale:1;
@@ -940,7 +942,11 @@
   .ticon{width:15px;height:15px;color:#b5bcc2;flex-shrink:0;}
   .ticon.soon{color:var(--orange);}
   .ticon.over{color:var(--red);}
-  .ticon.follow{color:var(--indigo);}
+  .ticon.follow{color:var(--tag-follow);}
+  .ticon.shift{color:var(--tag-shift);}
+  #tFollowUpRow svg{color:var(--tag-follow);} #tNextShiftRow svg{color:var(--tag-shift);}
+  .tt-tagrow.kbd-hi{background:var(--bg);}
+  #tTagBtn.tag-follow{color:var(--tag-follow);} #tTagBtn.tag-shift{color:var(--tag-shift);}
   .ticon.popped{color:var(--teal);}
   .tsec-head{cursor:pointer;user-select:none;}
   .tsec-head:hover{color:var(--dim);}
@@ -1268,11 +1274,10 @@
       <div class="kbd-row"><span class="desc">Toggle follow-up</span><kbd>f</kbd></div>
       <div class="kbd-row"><span class="desc">Schedule for later</span><kbd>t</kbd></div>
       <div class="kbd-row"><span class="desc">Toggle for next shift</span><kbd>n</kbd></div>
-      <div class="kbd-row"><span class="desc">New task: next shift</span><kbd>Alt+N</kbd></div>
       <div class="kbd-row"><span class="desc">New task below</span><kbd>Enter</kbd></div>
       <div class="kbd-row"><span class="desc">New subtask (nests under the selected row)</span><kbd>Shift+Enter</kbd></div>
       <div class="kbd-row"><span class="desc">New task: date / repeat</span><kbd>Alt+S</kbd></div>
-      <div class="kbd-row"><span class="desc">New task: follow up</span><kbd>Alt+T</kbd></div>
+      <div class="kbd-row"><span class="desc">New task: tags (follow up / next shift)</span><kbd>Alt+T</kbd></div>
       <div class="kbd-row"><span class="desc">Delete task</span><kbd>Del</kbd></div>
       <h4 style="margin-top:10px">QUICK-ADD SYNTAX</h4>
       <div class="kbd-row"><span class="desc">Priority</span><kbd>!a / !b / !c</kbd></div>
@@ -1815,7 +1820,7 @@
 <div class="overlay" id="taskOverlay">
   <div class="modal small">
     <h3 id="taskModalTitle">Create Task</h3>
-    <div class="msub">Ctrl+1/2/3 priority · Alt+S date &amp; repeat · Alt+T follow up · Alt+N next shift · Enter creates.</div>
+    <div class="msub">Ctrl+1/2/3 priority · Alt+S date &amp; repeat · Alt+T tags · Enter creates.</div>
     <div class="dt-target" id="tTarget"></div>
 
     <div class="tt-composer">
@@ -4064,18 +4069,23 @@ document.addEventListener('keydown', e=>{
     return;
   }
   /* Alt+S opens the date / repeat popover, Alt+T toggles the follow-up tag (Create Task modal; by key position so it works in any layout) */
-  if(e.altKey && !e.ctrlKey && !e.metaKey && (e.code==='KeyS' || e.code==='KeyT' || e.code==='KeyN') && document.getElementById('taskOverlay').classList.contains('show')){
+  if(e.altKey && !e.ctrlKey && !e.metaKey && (e.code==='KeyS' || e.code==='KeyT') && document.getElementById('taskOverlay').classList.contains('show')){
     e.preventDefault();
     if(e.code==='KeyS'){
       if(!document.getElementById('tCalPop').classList.contains('show')) document.getElementById('tCalBtn').click();
       else closeAllTtPopovers();
-    }else if(e.code==='KeyN'){
-      toggleComposerNextShift();
-      toast(taskModalNextShift ? 'For next shift: on' : 'For next shift: off');
     }else{
-      toggleComposerFollowUp();
-      toast(taskModalFollowUp ? 'Follow up: on' : 'Follow up: off');
+      /* Alt+T — open the tag dropdown; ↑/↓ + Enter (or a click) picks a tag */
+      if(document.getElementById('tTagPop').classList.contains('show')) closeAllTtPopovers();
+      else{ document.getElementById('tTagBtn').click(); tagKbdIdx = 0; hiTagRow(); }
     }
+    return;
+  }
+  if(document.getElementById('tTagPop').classList.contains('show') && ['ArrowDown','ArrowUp','Enter'].includes(e.key)){
+    e.preventDefault(); e.stopPropagation();
+    const rows = document.querySelectorAll('#tTagPop .tt-tagrow');
+    if(e.key==='Enter') rows[tagKbdIdx].click();
+    else{ tagKbdIdx = (tagKbdIdx + (e.key==='ArrowDown'?1:-1) + rows.length) % rows.length; hiTagRow(); }
     return;
   }
   /* Ctrl+1/2/3 — priority A/B/C in the Create Task modal or the open task */
@@ -5309,6 +5319,7 @@ function tasksPageHTML(){
       ${(t.subtasks||[]).length ? `<button class="mini-btn subcollapse" data-subcollapse="${subKey(t.id,[])}" title="${t.subCollapsed?'Show':'Hide'} subtasks (${t.subtasks.length})" style="width:20px;height:20px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform:rotate(${t.subCollapsed?'180':'90'}deg);transition:transform .12s"><path d="M9 6l6 6-6 6"/></svg></button>` : ''}
       <span class="ttxt">${t.text}</span>
       ${t.followUp ? `<svg class="ticon follow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><title>Follow up</title></svg>` : ''}
+      ${t.nextShift ? `<svg class="ticon shift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/><title>For next shift</title></svg>` : ''}
       ${t.wasScheduled ? `<svg class="ticon popped" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/><title>Was scheduled</title></svg>` : ''}
       ${t.repeat ? `<svg class="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/><title>Repeats ${t.repeat}</title></svg>` : ''}
       ${dtAlert ? `<button class="ticon soon" data-taskdtremove="${dtAlert.id}" title="Alert in downtime — click to cancel" style="border:none;background:none;cursor:pointer;padding:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.346 5.353c.21 -.129 .428 -.246 .654 -.353a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3m-1 3h-13a4 4 0 0 0 2 -3v-3a6.996 6.996 0 0 1 1.273 -3.707"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><path d="M3 3l18 18"/></svg></button>` : ''}
@@ -5660,6 +5671,10 @@ function updateFlagUI(){
     r.classList.toggle('selected', r.dataset.flag===p);
   });
 }
+let tagKbdIdx = 0;
+function hiTagRow(){
+  document.querySelectorAll('#tTagPop .tt-tagrow').forEach((r,i)=>r.classList.toggle('kbd-hi', i===tagKbdIdx));
+}
 function toggleComposerFollowUp(){
   taskModalFollowUp = !taskModalFollowUp;
   updateTagUI();
@@ -5669,7 +5684,10 @@ function toggleComposerNextShift(){
   updateTagUI();
 }
 function updateTagUI(){
-  document.getElementById('tTagBtn').classList.toggle('active', taskModalFollowUp || taskModalNextShift);
+  const tb = document.getElementById('tTagBtn');
+  tb.classList.toggle('active', taskModalFollowUp || taskModalNextShift);
+  tb.classList.toggle('tag-follow', taskModalFollowUp && !taskModalNextShift);
+  tb.classList.toggle('tag-shift', taskModalNextShift);
   document.getElementById('tFollowUpRow').classList.toggle('selected', taskModalFollowUp);
   document.getElementById('tNextShiftRow').classList.toggle('selected', taskModalNextShift);
 }
@@ -5820,11 +5838,11 @@ function renderTaskDrawer(){
     </div>
     <div class="tmeta">
       <button class="prio ${t.priority}" data-act="cycleprio" title="Click to cycle A→B→C" style="cursor:pointer;border:none">${t.priority}</button>
-      <button class="tchip ${t.followUp?'follow-on':''}" data-act="togglefollow" title="Toggle follow-up (keyboard: F when this task is selected in the list)" style="cursor:pointer;border:${t.followUp?'1px solid var(--indigo)':'1px solid var(--border)'};background:${t.followUp?'#edf1ff':'var(--bg)'};color:${t.followUp?'var(--indigo)':'var(--dim)'}">
+      <button class="tchip ${t.followUp?'follow-on':''}" data-act="togglefollow" title="Toggle follow-up (keyboard: F when this task is selected in the list)" style="cursor:pointer;border:${t.followUp?'1px solid var(--tag-follow)':'1px solid var(--border)'};background:${t.followUp?'var(--tag-follow-bg)':'var(--bg)'};color:${t.followUp?'var(--tag-follow)':'var(--dim)'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
         Follow up
       </button>
-      <button class="tchip ${t.nextShift?'follow-on':''}" data-act="togglenextshift" title="Toggle for next shift (keyboard: N when this task is selected in the list)" style="cursor:pointer;border:${t.nextShift?'1px solid var(--violet)':'1px solid var(--border)'};background:${t.nextShift?'#f3eeff':'var(--bg)'};color:${t.nextShift?'var(--violet)':'var(--dim)'}">
+      <button class="tchip ${t.nextShift?'follow-on':''}" data-act="togglenextshift" title="Toggle for next shift (keyboard: N when this task is selected in the list)" style="cursor:pointer;border:${t.nextShift?'1px solid var(--tag-shift)':'1px solid var(--border)'};background:${t.nextShift?'var(--tag-shift-bg)':'var(--bg)'};color:${t.nextShift?'var(--tag-shift)':'var(--dim)'}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
         For next shift
       </button>
