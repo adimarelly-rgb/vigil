@@ -1265,7 +1265,7 @@
     </button>
     <div class="kbd-pop" id="kbdPop" onclick="event.stopPropagation()">
       <h4>KEYBOARD SHORTCUTS</h4>
-      <div class="kbd-row"><span class="desc">New task (anywhere)</span><kbd>Ctrl+Shift+T</kbd></div>
+      <div class="kbd-row"><span class="desc">New task (anywhere)</span><kbd>Ctrl+Shift+T · Alt+N</kbd></div>
       <div class="kbd-row"><span class="desc">Priority A / B / C</span><kbd>Ctrl+1/2/3</kbd></div>
       <div class="kbd-row"><span class="desc">Focus quick-add</span><kbd>a</kbd></div>
       <div class="kbd-row"><span class="desc">Select up / down</span><kbd>↑ ↓</kbd></div>
@@ -4063,7 +4063,11 @@ document.addEventListener('keydown', e=>{
   const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
 
   /* Ctrl+Shift+T / N / A — new task from anywhere */
-  if(e.ctrlKey && e.shiftKey && ['t','n','a'].includes(e.key.toLowerCase()) && !isMvp()){
+  /* also Alt+N (works in any keyboard layout, doesn't clash with other apps' Ctrl+Shift+A) */
+  const newTaskKey = (e.ctrlKey && e.shiftKey && (['t','n','a'].includes(e.key.toLowerCase()) || ['KeyT','KeyN','KeyA'].includes(e.code)))
+    || (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.code==='KeyN'
+        && !document.getElementById('taskOverlay').classList.contains('show'));
+  if(newTaskKey && !isMvp()){
     e.preventDefault();
     openTaskModal([]);
     return;
