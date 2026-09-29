@@ -2135,10 +2135,10 @@ let tileSeq = 1;
 
 /* Tasks: {id, text, done, priority(A|B|C), due(ts|null), repeat(null|hourly|daily|weekly), alertIds, notes, links, createdAt} */
 let tasksData = [
-  {id:1, text:'Review ransomware containment on FIN-WKS-014', done:false, priority:'A', ord:0, due:NOW+30*MIN, repeat:null, alertIds:[1], notes:[{text:'Task created', at:NOW-40*MIN}], links:[], createdAt:NOW-40*MIN},
-  {id:2, text:'Verify MFA policy after failed prompts', done:false, priority:'B', ord:1, due:NOW-20*MIN, repeat:null, alertIds:[5], notes:[], links:[], createdAt:NOW-2*HOUR},
-  {id:4, text:'Check backup job completed', done:false, priority:'B', ord:2, due:NOW+8*HOUR, repeat:'daily', alertIds:[], notes:[], links:[], createdAt:NOW-DAY},
-  {id:3, text:'Rotate TLS cert for api.internal.vigil.io', done:false, priority:'C', ord:3, due:NOW+26*HOUR, repeat:null, alertIds:[8], notes:[], links:[], createdAt:NOW-3*HOUR},
+  {id:1, text:'Review ransomware containment on FIN-WKS-014', done:false, priority:'A', ord:0, due:null, repeat:null, alertIds:[1], notes:[{text:'Task created', at:NOW-40*MIN}], links:[], createdAt:NOW-40*MIN},
+  {id:2, text:'Verify MFA policy after failed prompts', done:false, priority:'B', ord:1, due:null, repeat:null, alertIds:[5], notes:[], links:[], createdAt:NOW-2*HOUR},
+  {id:4, text:'Check backup job completed', done:false, priority:'B', ord:2, due:null, repeat:'daily', alertIds:[], notes:[], links:[], createdAt:NOW-DAY},
+  {id:3, text:'Rotate TLS cert for api.internal.vigil.io', done:false, priority:'C', ord:3, due:null, repeat:null, alertIds:[8], notes:[], links:[], createdAt:NOW-3*HOUR},
   {id:5, text:'Write shift-handoff summary', done:true, priority:'C', ord:4, due:null, repeat:null, alertIds:[], notes:[], links:[], createdAt:NOW-6*HOUR},
 ];
 let taskSeq = 6;
@@ -4934,11 +4934,6 @@ document.getElementById('drawer').addEventListener('change', e=>{
       const v = e.target.value.trim();
       if(v){ t.text = v; render(); }
       else e.target.value = t.text;
-    }else if(e.target.id==='taskDueIn'){
-      const v = e.target.value;
-      t.due = v ? new Date(v).getTime() : null;
-      taskNotified.delete(t.id);
-      render();
     }else if(e.target.id==='taskRepeatSel'){
       t.repeat = e.target.value || null;
       t.notes.push({text: t.repeat ? `Repeat set: ${t.repeat}` : 'Repeat removed', at:Date.now()});
@@ -5157,7 +5152,6 @@ function tasksPageHTML(){
 
   const renderRow = t=>{
     taskOrder.push(t.id);
-    const dc = dueClass(t);
     const dtAlert = t.alertIds.map(id=>alerts.find(a=>a.id===id)).find(a=>a && a.status==='downtime');
     html += `<div class="trow ${t.done?'done':''} ${selectedTaskId===t.id?'sel':''}" data-task="${t.id}">
       <span class="tdrag" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 6h10M7 12h10M7 18h10"/></svg></span>
@@ -5166,7 +5160,6 @@ function tasksPageHTML(){
       ${t.followUp ? `<svg class="ticon follow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><title>Follow up</title></svg>` : ''}
       ${t.wasScheduled ? `<svg class="ticon popped" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/><title>Was scheduled</title></svg>` : ''}
       ${t.repeat ? `<svg class="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/><title>Repeats ${t.repeat}</title></svg>` : ''}
-      ${t.due ? `<svg class="ticon ${dc}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><title>Reminder: ${fmtDue(t.due)}</title></svg>` : ''}
       ${dtAlert ? `<button class="ticon soon" data-taskdtremove="${dtAlert.id}" title="Alert in downtime — click to cancel" style="border:none;background:none;cursor:pointer;padding:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.346 5.353c.21 -.129 .428 -.246 .654 -.353a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3m-1 3h-13a4 4 0 0 0 2 -3v-3a6.996 6.996 0 0 1 1.273 -3.707"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/><path d="M3 3l18 18"/></svg></button>` : ''}
       <button class="prio ${t.priority}" data-taskflag="${t.id}" title="Priority (click to cycle A→B→C)" style="cursor:pointer;border:none">${t.priority}</button>
     </div>`;
@@ -5288,12 +5281,10 @@ function toggleTaskDone(id){
   if(!t) return;
   if(!t.done && t.repeat){
     /* recurring task: completing it schedules the next occurrence */
-    const base = t.due && t.due > Date.now() ? t.due : Date.now();
-    t.due = base + REPEAT_MS[t.repeat];
-    taskNotified.delete(t.id);
-    t.notes.push({text:`Completed — next occurrence: ${fmtClock(t.due)}`, at:Date.now()});
+    const next = Date.now() + REPEAT_MS[t.repeat];
+    t.notes.push({text:`Completed — next occurrence: ${fmtClock(next)}`, at:Date.now()});
     render();
-    toast(`🔁 Done — next: ${fmtDue(t.due)}`);
+    toast(`🔁 Done — next: ${fmtDue(next)}`);
     return;
   }
   t.done = !t.done;
@@ -5605,7 +5596,7 @@ function saveTaskModal(){
   if(!tagged.text){ toast('Task text is required'); return; }
   let due = null;
   const dv = document.getElementById('tDue').value;
-  if(dv){ due = new Date(dv).getTime(); if(isNaN(due)) due = null; }
+  /* reminders were removed — tasks no longer carry a due time */
 
   const priority = document.getElementById('tPrio').value;
   const everyMs = computeRepeatMs();
@@ -5657,7 +5648,6 @@ function openTaskDrawer(id){
 function renderTaskDrawer(){
   const t = taskById(drawerId);
   if(!t) return;
-  const dc = dueClass(t);
   document.getElementById('drawerHead').innerHTML = `
     <div class="drawer-toprow" style="position:relative">
       <span class="tcheck" data-act="tasktoggle" style="${t.done?'background:#0ca678;border-color:#0ca678':''}">
@@ -5685,25 +5675,6 @@ function renderTaskDrawer(){
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>
         ${t.repeat ? t.repeat.charAt(0).toUpperCase()+t.repeat.slice(1) : 'Repeat'}
       </button>
-      <button class="tchip ${t.due?dc:''}" onclick="event.stopPropagation();toggleTMenu('tmenuReminder',this)" title="Reminder" style="cursor:pointer;${t.due?(dc?'':'border:1px solid var(--orange);background:var(--orange-bg);color:var(--orange)'):'border:1px solid var(--border);background:var(--bg);color:var(--dim)'}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
-        ${t.due ? fmtDue(t.due) : 'Reminder'}
-      </button>
-      <div class="tmenu" id="tmenuReminder" onclick="event.stopPropagation()" style="top:34px;left:0;right:auto">
-        <h4>REMINDER</h4>
-        <span class="chips" style="margin:0 0 8px">
-          <button class="chip" data-act="taskduechip" data-ms="${10*MIN}">10m</button>
-          <button class="chip" data-act="taskduechip" data-ms="${30*MIN}">30m</button>
-          <button class="chip" data-act="taskduechip" data-ms="${1*HOUR}">1h</button>
-          <button class="chip" data-act="taskduechip" data-ms="${3*HOUR}">3h</button>
-          <button class="chip" data-act="taskduechip" data-ms="tmrw">Tmrw 9:00</button>
-        </span>
-        <div style="display:flex;gap:7px;align-items:center">
-          <input type="datetime-local" id="taskDueIn" value="${t.due ? toLocalInput(t.due) : ''}"
-            style="flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:calc(12.5px * var(--fs-scale));outline:none">
-          ${t.due ? `<button class="btn" data-act="taskduechip" data-ms="clear" style="padding:6px 10px;font-size:calc(12px * var(--fs-scale))">Remove</button>` : ''}
-        </div>
-      </div>
       <div class="tmenu" id="tmenuRepeat" onclick="event.stopPropagation()" style="top:34px;left:0;right:auto">
         <h4>REPEAT</h4>
         <select id="taskRepeatSel" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:calc(13px * var(--fs-scale));outline:none;background:var(--panel)">
@@ -5798,20 +5769,6 @@ function handleTaskDrawerAct(act, btn){
     }
     case 'taskprio': setTaskPriority(t.id, btn.dataset.p); break;
     case 'togglefollow': toggleTaskFollowUp(t.id); break;
-    case 'taskduechip': {
-      const v = btn.dataset.ms;
-      if(v==='clear'){ t.due = null; }
-      else if(v==='tmrw'){
-        const d = new Date(); d.setDate(d.getDate()+1); d.setHours(9,0,0,0);
-        t.due = d.getTime();
-      }else{
-        t.due = Date.now() + (+v);
-      }
-      taskNotified.delete(t.id);
-      if(t.due) t.notes.push({text:`Reminder set: ${fmtClock(t.due)}`, at:Date.now()});
-      render();
-      break;
-    }
     case 'taskdelete': deleteTask(t.id); break;
     case 'opentaskalert': {
       const id = +btn.dataset.id;
@@ -5923,11 +5880,6 @@ setInterval(()=>{
   if(isMvp()) return;   /* no tasks in MVP1 */
   let changed = false;
   tasksData.forEach(t=>{
-    if(!t.done && t.due && t.due <= Date.now() && !taskNotified.has(t.id)){
-      taskNotified.add(t.id);
-      toast(`⏰ Task due: "${t.text}"`);
-      changed = true;
-    }
     if(!t.done && t.scheduledFor && t.scheduledFor <= Date.now() && !t.wasScheduled){
       t.wasScheduled = true;
       t.scheduledFor = null; /* now behaves like a normal task */
@@ -6227,7 +6179,7 @@ function dashboardHTML(){
               <span class="abadge" style="background:${PRIO_COLORS[t.priority]}">${t.priority}</span>
               <span class="pr-main">
                 <div class="pr-title">${t.text}</div>
-                <div class="pr-sub">${t.due ? 'Due '+fmtDue(t.due) : 'No due date'}</div>
+                <div class="pr-sub">${t.followUp ? 'Follow up' : ''}</div>
               </span>
             </div>`).join('') : `<div class="gempty">No priority ${dashTaskPrioTab} tasks</div>`}
         </div>
@@ -6349,12 +6301,11 @@ function popTasks(title, arr, jumpHash){
   document.getElementById('tilePopSub').textContent = `${arr.length} task${arr.length===1?'':'s'} · click one to open it`;
   setPopJump(jumpHash);
   document.getElementById('tilePopList').innerHTML = arr.map(t=>{
-    const over = dueClass(t)==='over';
     return `<div class="pop-row" data-poptask="${t.id}">
       <span class="abadge" style="background:${PRIO_COLORS[t.priority]};width:28px;height:28px;font-size:calc(12px * var(--fs-scale))">${t.priority}</span>
       <span class="pr-main">
         <div class="pr-title">${t.text}</div>
-        <div class="pr-sub" ${over?'style="color:var(--red)"':''}>${t.due ? (over?'Overdue since ':'Due ')+fmtDue(t.due) : 'No due date'}</div>
+        <div class="pr-sub">${t.followUp ? 'Follow up' : ''}</div>
       </span>
     </div>`;
   }).join('') || `<div class="gempty">Nothing here</div>`;
@@ -6565,6 +6516,7 @@ function loadState(){
       if(s.shiftTiles) shiftTiles = s.shiftTiles;
       if(typeof s.tileSeq==='number') tileSeq = s.tileSeq;
       if(s.tasksData) tasksData = s.tasksData;
+      tasksData.forEach(t=>{ t.due = null; });
       if(typeof s.taskSeq==='number') taskSeq = s.taskSeq;
       if(s.taskOrder) taskOrder = s.taskOrder;
       if(s.periodicTasks) periodicTasks = s.periodicTasks;
