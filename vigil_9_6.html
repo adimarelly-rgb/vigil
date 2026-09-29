@@ -617,9 +617,6 @@
   .tt-flagrow .tt-check, .tt-tagrow .tt-check{margin-left:auto;color:var(--teal);opacity:0;}
   .tt-flagrow.selected .tt-check, .tt-tagrow.selected .tt-check{opacity:1;}
 
-  .tt-tabs{display:flex;gap:4px;margin-bottom:10px;background:var(--bg);border-radius:8px;padding:3px;}
-  .tt-tab{flex:1;padding:6px 0;border-radius:6px;font-size:calc(12px * var(--fs-scale));font-weight:600;color:var(--dim);}
-  .tt-tab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1);}
 
   .tt-quickrow{display:flex;gap:5px;margin-bottom:10px;}
   .tt-quick{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 2px;
@@ -949,7 +946,7 @@
   .tsec-head:hover{color:var(--dim);}
   /* periodic mode: the date popover shows the Repeat section only */
   #taskOverlay.periodic-mode #tTarget{display:none;}
-  #taskOverlay.periodic-mode #tCalPop .tt-tabs, #taskOverlay.periodic-mode #tCalPop .tt-quickrow,
+  #taskOverlay.periodic-mode #tCalPop .tt-quickrow,
   #taskOverlay.periodic-mode #tCalPop .tt-calhead, #taskOverlay.periodic-mode #tCalPop #tCalGrid,
   #taskOverlay.periodic-mode #tCalPop #tTimeRow, #taskOverlay.periodic-mode #tCalPop #tTimeBody{display:none !important;}
   .tsec-head.static:hover{color:var(--dim2);}
@@ -1818,11 +1815,6 @@
             <span class="tt-icon-label" id="tCalLabel"></span>
           </button>
           <div class="tt-pop" id="tCalPop">
-            <div class="tt-tabs">
-              <button type="button" class="tt-tab active" id="tTabDateBtn" onclick="setCalTab('date')">Date</button>
-              <button type="button" class="tt-tab" id="tTabDurBtn" onclick="setCalTab('duration')">Duration</button>
-            </div>
-
             <div id="calTabDate">
               <div class="tt-quickrow">
                 <button type="button" class="tt-quick" onclick="pickTaskDatePreset('today')" title="Today">
@@ -1886,17 +1878,6 @@
                     </select>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div id="calTabDuration" style="display:none">
-              <div class="field" style="margin:10px 0">
-                <label>Start</label>
-                <input type="datetime-local" id="tDurationStart" onchange="onDurationChange()">
-              </div>
-              <div class="field" style="margin-bottom:0">
-                <label>End</label>
-                <input type="datetime-local" id="tDurationEnd" onchange="onDurationChange()">
               </div>
             </div>
 
@@ -5341,12 +5322,6 @@ function toggleTtPop(event, popId){
 function closeAllTtPopovers(){
   document.querySelectorAll('.tt-pop.show').forEach(p=>p.classList.remove('show'));
 }
-function setCalTab(tab){
-  document.getElementById('calTabDate').style.display = tab==='date' ? '' : 'none';
-  document.getElementById('calTabDuration').style.display = tab==='duration' ? '' : 'none';
-  document.getElementById('tTabDateBtn').classList.toggle('active', tab==='date');
-  document.getElementById('tTabDurBtn').classList.toggle('active', tab==='duration');
-}
 function shiftCalMonth(delta){
   calViewMonth += delta;
   if(calViewMonth<0){ calViewMonth=11; calViewYear--; }
@@ -5424,11 +5399,6 @@ function applyComposerDateTime(){
   }
   updateCalSummary();
 }
-function onDurationChange(){
-  document.getElementById('tScheduleAt').value = document.getElementById('tDurationStart').value;
-  document.getElementById('tDue').value = document.getElementById('tDurationEnd').value;
-  updateCalSummary();
-}
 function onRepeatPresetChange(){
   const isCustom = document.getElementById('tRepeatPreset').value === 'custom';
   document.getElementById('tRepeatCustomRow').style.display = isCustom ? 'flex' : 'none';
@@ -5468,8 +5438,6 @@ function clearCalPopover(){
   document.getElementById('tRepeatPreset').value = '';
   document.getElementById('tRepeatCustomRow').style.display = 'none';
   document.getElementById('tRepeatCustomStart').value = '';
-  document.getElementById('tDurationStart').value = '';
-  document.getElementById('tDurationEnd').value = '';
   document.getElementById('tScheduleAt').value = '';
   document.getElementById('tDue').value = '';
   renderTaskCalGrid();
@@ -5525,7 +5493,6 @@ function resetTaskComposer(){
   populateTimeSelectOptions();
   document.getElementById('tRepeatCustomN').value = '1';
   document.getElementById('tRepeatCustomUnit').value = 'days';
-  setCalTab('date');
   ['tTimeRow','tRepeatRow'].forEach(id=>document.getElementById(id).classList.remove('open'));
   document.getElementById('tTimeBody').style.display = 'none';
   document.getElementById('tRepeatBody').style.display = 'none';
