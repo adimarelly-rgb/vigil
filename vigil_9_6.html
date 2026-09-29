@@ -941,11 +941,13 @@
   .ticon.popped{color:var(--teal);}
   .tsec-head{cursor:pointer;user-select:none;}
   .tsec-head:hover{color:var(--dim);}
+  .tsec-head.static:hover{color:var(--dim2);}
   .tsec-head .chev{width:12px;height:12px;transition:transform .12s;flex-shrink:0;}
   .tsec-count{font-weight:700;letter-spacing:0;}
   .tsched-list{background:var(--bg);}
+  .tsched-row.sel{background:var(--sel);}
   .tsched-row{
-    display:flex;align-items:center;gap:10px;padding:8px 14px 8px 38px;
+    display:flex;align-items:center;gap:10px;padding:8px 14px;
     border-bottom:1px solid var(--border);font-size:calc(13.5px * var(--fs-scale));
   }
   .tsched-row .ttxt{flex:1;color:var(--dim);}
@@ -2687,8 +2689,6 @@ function render(){
     document.getElementById('table').innerHTML = tasksPageHTML();
     renderSelbar();
     syncDrawer();
-    const qa = document.getElementById('qaddInput');
-    if(qa && document.activeElement && document.activeElement.id!=='listSearch' && document.activeElement.tagName!=='INPUT') qa.focus();
     return;
   }
 
@@ -4022,7 +4022,7 @@ document.addEventListener('keydown', e=>{
     const idx = taskOrder.indexOf(selectedTaskId);
     if(e.key==='a'){
       e.preventDefault();
-      document.getElementById('qaddInput')?.focus();
+      openTaskModal([]);
       return;
     }
     if(e.key==='ArrowDown' || e.key==='ArrowUp'){
@@ -4032,7 +4032,8 @@ document.addEventListener('keydown', e=>{
       if(idx===-1) ni = e.key==='ArrowDown' ? 0 : taskOrder.length-1;
       ni = Math.max(0, Math.min(taskOrder.length-1, ni));
       selectedTaskId = taskOrder[ni];
-      render();
+      if(drawerId!==null && drawerType==='task') _showDrawer('task', selectedTaskId); /* keep the side panel following the selection */
+      else render();
       return;
     }
     if(selectedTaskId!==null && taskById(selectedTaskId)){
@@ -4042,7 +4043,14 @@ document.addEventListener('keydown', e=>{
       if(e.key==='x'){ toggleTaskDone(selectedTaskId); return; }
       if(e.key==='f'){ toggleTaskFollowUp(selectedTaskId); return; }
       if(e.key==='t'){ openScheduleModal(selectedTaskId); return; }
-      if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); deleteTask(selectedTaskId); return; }
+      if(e.key==='Delete' || e.key==='Backspace'){
+        e.preventDefault();
+        const keepOpen = drawerId!==null && drawerType==='task';
+        const nextId = taskOrder[idx+1] ?? taskOrder[idx-1] ?? null;
+        deleteTask(selectedTaskId);
+        if(keepOpen && nextId!==null && taskById(nextId)) _showDrawer('task', nextId); /* panel stays open on the neighbouring task */
+        return;
+      }
       if(e.key==='Enter'){ openTaskDrawer(selectedTaskId); return; }
     }
   }
@@ -5102,11 +5110,9 @@ function tasksPageHTML(){
   const q = document.getElementById('listSearch').value.trim().toLowerCase();
   taskOrder = [];
   let html = `<div dir="rtl">
-    <div style="padding:10px 14px 8px;display:flex;gap:8px;align-items:center;position:relative">
-      <div class="qadd sm">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-        <input id="qaddInput" placeholder="הוספת משימה...">
-      </div>
+    <div class="tperiodic-head tsec-head static" style="margin-top:0;border-top:none;cursor:default">
+      <span>TODO</span>
+      <button class="mini-btn" title="Add task (A)" onclick="openTaskModal([])">${ICONS.plus}</button>
     </div>`;
   const vis = tasksData.filter(t=>!q || t.text.toLowerCase().includes(q));
   const now = Date.now();
@@ -5143,7 +5149,8 @@ function tasksPageHTML(){
   if(taskSectionsOpen.scheduled){
     html += scheduledHidden.length
       ? `<div class="tsched-list">` + scheduledHidden.map(t=>`
-        <div class="tsched-row" data-task="${t.id}">
+        <div class="tsched-row ${selectedTaskId===t.id?'sel':''}" data-task="${t.id}" style="cursor:pointer">
+          <svg class="ticon popped" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M5 3L3 5M19 3l2 2"/><title>Scheduled task</title></svg>
           <span class="ttxt">${t.text}</span>
           <span class="prio ${t.priority}" style="pointer-events:none">${t.priority}</span>
           <span class="tsched-time">${fmtDue(t.scheduledFor)}</span>
